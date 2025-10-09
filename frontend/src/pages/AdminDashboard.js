@@ -13,6 +13,7 @@ import { Users, MessageSquare, Shield, UserPlus, Ban, Trash2, Key, LogOut, Refre
 import { toast } from 'sonner';
 import { translations } from '../i18n/translations';
 import Settings from './Settings';
+import SystemMonitoring from './SystemMonitoring';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
