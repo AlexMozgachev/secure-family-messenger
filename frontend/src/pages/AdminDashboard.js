@@ -402,6 +402,19 @@ const AdminDashboard = ({ onLogout }) => {
                           <Button
                             size="sm"
                             variant="outline"
+                            className="border-purple-600 text-purple-400 hover:bg-purple-900/20"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setShowChangeRole(true);
+                            }}
+                            disabled={user.id === currentUser?.id}
+                            data-testid={`change-role-btn-${user.username}`}
+                          >
+                            <ShieldCheck className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
                             className={user.is_blocked ? 'border-emerald-600 text-emerald-400 hover:bg-emerald-900/20' : 'border-red-600 text-red-400 hover:bg-red-900/20'}
                             onClick={() => handleBlockUser(user.id, user.is_blocked)}
                             disabled={user.is_admin}
