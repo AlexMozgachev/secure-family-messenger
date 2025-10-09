@@ -6,6 +6,11 @@ export const translations = {
     'logout': 'Выход',
     'security': 'Безопасность',
     'dashboard': 'Панель',
+    'settings': 'Настройки',
+    'server_settings': 'Сервер',
+    'ssl_management': 'SSL Сертификаты',
+    'backup_restore': 'Бэкап и восстановление',
+    'chats_metadata': 'Чаты',
     
     // Stats
     'users': 'Пользователей',
