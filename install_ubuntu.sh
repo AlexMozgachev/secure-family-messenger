@@ -224,6 +224,13 @@ setup_frontend() {
     
     cd /opt/Secure-Messenger-Builder/frontend
     
+    # Проверяем совместимость с Node.js 18
+    if [ -f "../package_ubuntu20.json" ]; then
+        print_status "Использование совместимых зависимостей для Node.js 18..."
+        cp package.json package.json.backup
+        cp ../package_ubuntu20.json package.json
+    fi
+    
     # Установка зависимостей
     yarn install
     
