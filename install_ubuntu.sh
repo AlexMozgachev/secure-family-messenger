@@ -192,7 +192,18 @@ setup_backend() {
     # Активация и установка зависимостей
     source venv/bin/activate
     pip install --upgrade pip
-    pip install -r requirements.txt
+    
+    # Попробуем установить с совместимыми версиями для Ubuntu 20.04
+    if [ -f "../requirements_ubuntu20.txt" ]; then
+        print_status "Установка совместимых зависимостей для Ubuntu 20.04..."
+        pip install -r ../requirements_ubuntu20.txt
+    else
+        print_status "Установка стандартных зависимостей..."
+        pip install -r requirements.txt || {
+            print_warning "Ошибка установки requirements.txt, пробуем минимальную установку..."
+            pip install fastapi==0.104.1 uvicorn[standard]==0.24.0 motor==3.3.1 pymongo==4.5.0 python-dotenv==1.0.0 python-multipart==0.0.6 passlib[bcrypt]==1.7.4 bcrypt==4.0.1 pydantic==2.5.3 psutil==5.9.6 requests==2.31.0 PyJWT==2.8.0
+        }
+    fi
     deactivate
     
     # Создание .env файла
