@@ -311,6 +311,23 @@ export const translations = {
     'settings_saved': 'Settings saved',
     'ssl_renewed': 'SSL certificate renewed',
     
+    // System Monitoring
+    'system_monitoring': 'System Monitoring',
+    'system_performance': 'Server Performance',
+    'cpu_usage': 'CPU Usage',
+    'memory_usage': 'Memory Usage',
+    'disk_usage': 'Disk Usage',
+    'network_traffic': 'Network Traffic',
+    'system_uptime': 'System Uptime',
+    'load_average': 'Load Average',
+    'cores': 'cores',
+    'sent': 'Sent',
+    'received': 'Received',
+    'total_traffic': 'Total Traffic',
+    'hours': 'hours',
+    'view_devices_list': 'Devices List',
+    'connected_devices': 'Connected Devices',
+    
     // Login Page
     'login_page_title': 'Admin Panel',
     'login_page_desc': 'Sign in to manage messenger',
