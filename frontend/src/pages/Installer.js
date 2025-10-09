@@ -205,8 +205,103 @@ const Installer = ({ onComplete }) => {
             </div>
           )}
 
-          {/* Step 2: Admin Credentials */}
+          {/* Step 2: Connection Type */}
           {step === 2 && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="text-center space-y-2">
+                <h3 className="text-2xl font-semibold text-white">Тип подключения</h3>
+                <p className="text-slate-300">
+                  Выберите способ подключения к серверу
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={() => setFormData({ ...formData, connection_type: 'ip' })}
+                  className={`p-6 rounded-xl border-2 transition-all ${
+                    formData.connection_type === 'ip'
+                      ? 'border-cyan-500 bg-cyan-500/10'
+                      : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                  }`}
+                >
+                  <h4 className="text-white font-semibold text-lg mb-2">IP Адрес</h4>
+                  <p className="text-slate-400 text-sm mb-3">
+                    Самоподписанный SSL сертификат
+                  </p>
+                  <Input
+                    type="text"
+                    value={formData.ip_address}
+                    onChange={(e) => setFormData({ ...formData, ip_address: e.target.value })}
+                    className="bg-slate-800 border-slate-600 text-white"
+                    placeholder="192.168.1.1"
+                    disabled={formData.connection_type !== 'ip'}
+                  />
+                </button>
+
+                <button
+                  onClick={() => setFormData({ ...formData, connection_type: 'domain' })}
+                  className={`p-6 rounded-xl border-2 transition-all ${
+                    formData.connection_type === 'domain'
+                      ? 'border-cyan-500 bg-cyan-500/10'
+                      : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                  }`}
+                >
+                  <h4 className="text-white font-semibold text-lg mb-2">Домен</h4>
+                  <p className="text-slate-400 text-sm mb-3">
+                    Let's Encrypt SSL сертификат
+                  </p>
+                  <Input
+                    type="text"
+                    value={formData.domain}
+                    onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
+                    className="bg-slate-800 border-slate-600 text-white"
+                    placeholder="messenger.example.com"
+                    disabled={formData.connection_type !== 'domain'}
+                  />
+                </button>
+              </div>
+
+              {formData.connection_type === 'domain' && (
+                <div className="flex items-center space-x-2 p-4 bg-slate-800/50 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="auto_ssl"
+                    checked={formData.auto_ssl}
+                    onChange={(e) => setFormData({ ...formData, auto_ssl: e.target.checked })}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor="auto_ssl" className="text-slate-300 text-sm">
+                    Автоматически обновлять SSL сертификат
+                  </label>
+                </div>
+              )}
+
+              {error && (
+                <Alert className="bg-red-500/10 border-red-500/50" data-testid="error-alert">
+                  <AlertDescription className="text-red-400">{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex space-x-3">
+                <Button
+                  onClick={() => setStep(1)}
+                  variant="outline"
+                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800 py-6"
+                >
+                  Назад
+                </Button>
+                <Button
+                  onClick={handleNext}
+                  className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold py-6 btn-hover"
+                >
+                  Далее
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Admin Credentials */}
+          {step === 3 && (
             <div className="space-y-6 animate-fadeIn">
               <div className="text-center space-y-2">
                 <h3 className="text-2xl font-semibold text-white">Создание учётной записи администратора</h3>
