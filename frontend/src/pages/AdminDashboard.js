@@ -447,21 +447,21 @@ const AdminDashboard = ({ onLogout }) => {
       <Dialog open={showResetPassword} onOpenChange={setShowResetPassword}>
         <DialogContent className="glass border-slate-700">
           <DialogHeader>
-            <DialogTitle className="text-white">Сбросить пароль</DialogTitle>
+            <DialogTitle className="text-white">{t('reset_password_title')}</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Введите новый пароль для пользователя {selectedUser?.username}
+              {t('reset_password_desc')} {selectedUser?.username}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="reset-password" className="text-slate-200">Новый пароль</Label>
+              <Label htmlFor="reset-password" className="text-slate-200">{t('new_password')}</Label>
               <Input
                 id="reset-password"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="bg-slate-800 border-slate-600 text-white"
-                placeholder="Минимум 6 символов"
+                placeholder={t('min_6_chars')}
                 data-testid="reset-password-input"
               />
             </div>
@@ -476,14 +476,65 @@ const AdminDashboard = ({ onLogout }) => {
               }}
               className="border-slate-600 text-slate-300 hover:bg-slate-800"
             >
-              Отмена
+              {t('cancel')}
             </Button>
             <Button
               onClick={handleResetPassword}
               className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white"
               data-testid="reset-password-submit-btn"
             >
-              Сбросить пароль
+              {t('reset_password')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Role Dialog */}
+      <Dialog open={showChangeRole} onOpenChange={setShowChangeRole}>
+        <DialogContent className="glass border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white">{t('change_role_title')}</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {t('change_role_desc')}: {selectedUser?.username}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="text-center space-y-4">
+              <p className="text-slate-300">
+                {t('role')}: <span className="font-semibold text-white">{selectedUser?.is_admin ? t('admin') : t('user')}</span>
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button
+                  onClick={() => handleChangeRole(true)}
+                  disabled={selectedUser?.is_admin}
+                  className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white"
+                  data-testid="make-admin-btn"
+                >
+                  <ShieldCheck className="w-4 h-4 mr-2" />
+                  {t('make_admin')}
+                </Button>
+                <Button
+                  onClick={() => handleChangeRole(false)}
+                  disabled={!selectedUser?.is_admin}
+                  variant="outline"
+                  className="border-slate-600 text-slate-300 hover:bg-slate-800"
+                  data-testid="make-user-btn"
+                >
+                  {t('make_user')}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowChangeRole(false);
+                setSelectedUser(null);
+              }}
+              className="border-slate-600 text-slate-300 hover:bg-slate-800"
+            >
+              {t('cancel')}
             </Button>
           </DialogFooter>
         </DialogContent>
