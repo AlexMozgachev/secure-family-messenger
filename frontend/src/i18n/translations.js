@@ -158,6 +158,8 @@ export const translations = {
     'hours': 'часов',
     'view_devices_list': 'Список устройств',
     'connected_devices': 'Подключенные устройства',
+    'user_devices': 'Устройства пользователя',
+    'close': 'Закрыть',
     
     // Login Page
     'login_page_title': 'Панель администратора',
