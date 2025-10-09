@@ -4,6 +4,8 @@ export const translations = {
     'admin_panel': 'Панель администратора',
     'administrator': 'Администратор',
     'logout': 'Выход',
+    'security': 'Безопасность',
+    'dashboard': 'Панель',
     
     // Stats
     'users': 'Пользователей',
