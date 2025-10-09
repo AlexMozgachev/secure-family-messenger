@@ -875,6 +875,84 @@ async def admin_get_stats(current_admin: User = Depends(get_current_admin)):
         "active_sessions": active_sessions
     }
 
+@api_router.get("/admin/system/monitoring")
+async def admin_get_system_monitoring(current_admin: User = Depends(get_current_admin)):
+    """Admin: Get system monitoring data (CPU, RAM, disk, network)"""
+    try:
+        # CPU usage
+        cpu_percent = psutil.cpu_percent(interval=1)
+        cpu_count = psutil.cpu_count()
+        
+        # Memory usage
+        memory = psutil.virtual_memory()
+        memory_used_gb = round(memory.used / (1024**3), 2)
+        memory_total_gb = round(memory.total / (1024**3), 2)
+        memory_percent = memory.percent
+        
+        # Disk usage
+        disk = psutil.disk_usage('/')
+        disk_used_gb = round(disk.used / (1024**3), 2)
+        disk_total_gb = round(disk.total / (1024**3), 2)
+        disk_percent = round((disk.used / disk.total) * 100, 1)
+        
+        # Network I/O statistics
+        network = psutil.net_io_counters()
+        network_sent_mb = round(network.bytes_sent / (1024**2), 2)
+        network_recv_mb = round(network.bytes_recv / (1024**2), 2)
+        
+        # System uptime
+        boot_time = psutil.boot_time()
+        uptime_seconds = time.time() - boot_time
+        uptime_hours = round(uptime_seconds / 3600, 1)
+        
+        # Load average (Linux/Unix only)
+        try:
+            load_avg = os.getloadavg()
+            load_1min = round(load_avg[0], 2)
+            load_5min = round(load_avg[1], 2)
+            load_15min = round(load_avg[2], 2)
+        except (OSError, AttributeError):
+            load_1min = load_5min = load_15min = 0.0
+        
+        return {
+            "cpu": {
+                "percent": cpu_percent,
+                "cores": cpu_count,
+                "load_avg_1min": load_1min,
+                "load_avg_5min": load_5min,
+                "load_avg_15min": load_15min
+            },
+            "memory": {
+                "used_gb": memory_used_gb,
+                "total_gb": memory_total_gb,
+                "percent": memory_percent
+            },
+            "disk": {
+                "used_gb": disk_used_gb,
+                "total_gb": disk_total_gb,
+                "percent": disk_percent
+            },
+            "network": {
+                "sent_mb": network_sent_mb,
+                "received_mb": network_recv_mb,
+                "total_mb": round(network_sent_mb + network_recv_mb, 2)
+            },
+            "system": {
+                "uptime_hours": uptime_hours,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    except Exception as e:
+        logging.error(f"Error getting system monitoring data: {e}")
+        return {
+            "error": "Unable to retrieve system monitoring data",
+            "cpu": {"percent": 0, "cores": 0},
+            "memory": {"used_gb": 0, "total_gb": 0, "percent": 0},
+            "disk": {"used_gb": 0, "total_gb": 0, "percent": 0},
+            "network": {"sent_mb": 0, "received_mb": 0, "total_mb": 0},
+            "system": {"uptime_hours": 0, "timestamp": datetime.now(timezone.utc).isoformat()}
+        }
+
 # ==================== SECURITY ENDPOINTS ====================
 
 @api_router.get("/admin/security/blocked-ips")
