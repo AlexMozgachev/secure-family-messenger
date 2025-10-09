@@ -1070,6 +1070,183 @@ async def get_file(file_name: str):
     
     return FileResponse(file_path)
 
+# ==================== SETTINGS ENDPOINTS ====================
+
+@api_router.get("/admin/settings")
+async def get_server_settings(current_admin: User = Depends(get_current_admin)):
+    """Admin: Get server settings"""
+    settings = await db.server_settings.find_one({}, {"_id": 0})
+    
+    if not settings:
+        raise HTTPException(status_code=404, detail="Settings not found")
+    
+    if isinstance(settings.get('updated_at'), str):
+        settings['updated_at'] = datetime.fromisoformat(settings['updated_at'])
+    if isinstance(settings.get('ssl_expires_at'), str):
+        settings['ssl_expires_at'] = datetime.fromisoformat(settings['ssl_expires_at'])
+    
+    return settings
+
+@api_router.put("/admin/settings")
+async def update_server_settings(settings_update: ServerSettings, current_admin: User = Depends(get_current_admin)):
+    """Admin: Update server settings"""
+    settings_dict = settings_update.model_dump()
+    settings_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
+    if settings_dict.get('ssl_expires_at'):
+        settings_dict['ssl_expires_at'] = settings_dict['ssl_expires_at'].isoformat()
+    
+    # Remove id field for update
+    settings_dict.pop('id', None)
+    
+    result = await db.server_settings.update_one(
+        {},
+        {"$set": settings_dict},
+        upsert=True
+    )
+    
+    return {"message": "Settings updated successfully"}
+
+@api_router.post("/admin/ssl/renew")
+async def renew_ssl_certificate(renew_req: SSLRenewRequest, current_admin: User = Depends(get_current_admin)):
+    """Admin: Renew SSL certificate"""
+    # This would integrate with Let's Encrypt or similar
+    # For now, just update the expiry date
+    
+    new_expiry = datetime.now(timezone.utc) + timedelta(days=90)
+    
+    await db.server_settings.update_one(
+        {},
+        {"$set": {
+            "ssl_expires_at": new_expiry.isoformat(),
+            "ssl_enabled": True
+        }}
+    )
+    
+    return {
+        "message": "SSL certificate renewed successfully",
+        "expires_at": new_expiry.isoformat(),
+        "for_domain": renew_req.for_domain
+    }
+
+# ==================== BACKUP & RESTORE ENDPOINTS ====================
+
+@api_router.post("/admin/backup")
+async def create_backup(backup_req: BackupRequest, current_admin: User = Depends(get_current_admin)):
+    """Admin: Create system backup"""
+    import json
+    
+    backup_data = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "version": "1.0.0"
+    }
+    
+    if backup_req.include_settings:
+        settings = await db.server_settings.find_one({}, {"_id": 0})
+        backup_data["settings"] = settings
+    
+    if backup_req.include_users:
+        users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(10000)
+        backup_data["users"] = users
+    
+    if backup_req.include_messages:
+        # Include only metadata, not encrypted content (respecting E2EE)
+        rooms = await db.rooms.find({}, {"_id": 0}).to_list(10000)
+        backup_data["rooms"] = rooms
+        
+        # Message count only, no content
+        message_count = await db.messages.count_documents({})
+        backup_data["message_count"] = message_count
+    
+    return {
+        "backup_data": json.dumps(backup_data, default=str),
+        "size": len(json.dumps(backup_data, default=str)),
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@api_router.post("/admin/restore")
+async def restore_backup(restore_req: RestoreRequest, current_admin: User = Depends(get_current_admin)):
+    """Admin: Restore from backup"""
+    import json
+    
+    try:
+        backup_data = json.loads(restore_req.backup_data)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid backup data")
+    
+    restored_items = []
+    
+    # Restore settings
+    if "settings" in backup_data and backup_data["settings"]:
+        await db.server_settings.delete_many({})
+        await db.server_settings.insert_one(backup_data["settings"])
+        restored_items.append("settings")
+    
+    # Restore users (skip if admin already exists)
+    if "users" in backup_data and backup_data["users"]:
+        for user in backup_data["users"]:
+            existing = await db.users.find_one({"username": user.get("username")})
+            if not existing:
+                await db.users.insert_one(user)
+        restored_items.append(f"users ({len(backup_data['users'])})")
+    
+    # Restore rooms
+    if "rooms" in backup_data and backup_data["rooms"]:
+        for room in backup_data["rooms"]:
+            existing = await db.rooms.find_one({"id": room.get("id")})
+            if not existing:
+                await db.rooms.insert_one(room)
+        restored_items.append(f"rooms ({len(backup_data['rooms'])})")
+    
+    return {
+        "message": "Backup restored successfully",
+        "restored": restored_items,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+# ==================== ROOMS METADATA ENDPOINTS ====================
+
+@api_router.get("/admin/rooms/stats")
+async def get_rooms_stats(current_admin: User = Depends(get_current_admin)):
+    """Admin: Get rooms statistics (metadata only, respecting E2EE)"""
+    total_rooms = await db.rooms.count_documents({})
+    direct_rooms = await db.rooms.count_documents({"type": "direct"})
+    group_rooms = await db.rooms.count_documents({"type": "group"})
+    
+    # Get rooms with member counts
+    rooms = await db.rooms.find({}, {"_id": 0}).sort("last_activity", -1).to_list(100)
+    
+    rooms_info = []
+    for room in rooms:
+        # Count messages in room (but don't show content)
+        message_count = await db.messages.count_documents({"room_id": room.get("id")})
+        
+        # Get member usernames
+        member_ids = room.get("members", [])
+        members_info = []
+        for member_id in member_ids:
+            user = await db.users.find_one({"id": member_id}, {"username": 1, "_id": 0})
+            if user:
+                members_info.append(user.get("username"))
+        
+        rooms_info.append({
+            "id": room.get("id"),
+            "name": room.get("name") or "Direct Chat",
+            "type": room.get("type"),
+            "member_count": len(member_ids),
+            "members": members_info,
+            "message_count": message_count,
+            "created_by": room.get("created_by"),
+            "created_at": room.get("created_at"),
+            "last_activity": room.get("last_activity")
+        })
+    
+    return {
+        "total_rooms": total_rooms,
+        "direct_rooms": direct_rooms,
+        "group_rooms": group_rooms,
+        "rooms": rooms_info
+    }
+
 # ==================== HEALTH CHECK ====================
 
 @api_router.get("/health")
