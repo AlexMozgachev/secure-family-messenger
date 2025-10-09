@@ -301,7 +301,6 @@ const AdminDashboard = ({ onLogout }) => {
         <SystemMonitoring 
           language={language} 
           t={t} 
-          onViewDevices={() => window.open('/admin/settings', '_blank')} 
         />
 
         {/* Users Table */}
