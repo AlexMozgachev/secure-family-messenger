@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-const SystemMonitoring = ({ language, t, onViewDevices }) => {
+const SystemMonitoring = ({ language, t }) => {
   const [monitoring, setMonitoring] = useState(null);
   const [loading, setLoading] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
