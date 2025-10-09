@@ -105,13 +105,13 @@ fi
 # Frontend .env
 cd ../frontend
 if [ ! -f .env ]; then
-    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s ipinfo.io/ip 2>/dev/null || hostname -I | awk '{print $1}')
-    [ -z "$SERVER_IP" ] && SERVER_IP="localhost"
+    # Используем localhost для избежания проблем с IPv6
+    SERVER_IP="127.0.0.1"
     
     cat > .env << EOF
 REACT_APP_BACKEND_URL=http://$SERVER_IP:8001
 EOF
-    print_success "Frontend .env создан"
+    print_success "Frontend .env создан (localhost)"
 fi
 
 # Исправление frontend зависимостей
