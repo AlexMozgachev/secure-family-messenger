@@ -329,6 +329,8 @@ export const translations = {
     'hours': 'hours',
     'view_devices_list': 'Devices List',
     'connected_devices': 'Connected Devices',
+    'user_devices': 'User Devices',
+    'close': 'Close',
     
     // Login Page
     'login_page_title': 'Admin Panel',
