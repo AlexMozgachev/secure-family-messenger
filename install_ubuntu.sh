@@ -234,9 +234,9 @@ setup_frontend() {
     # Установка зависимостей
     yarn install
     
-    # Создание .env файла
+    # Создание .env файла (используем localhost)
     cat > .env << EOF
-REACT_APP_BACKEND_URL=http://$SERVER_IP:8001
+REACT_APP_BACKEND_URL=http://127.0.0.1:8001
 EOF
     
     print_success "Frontend настроен"
