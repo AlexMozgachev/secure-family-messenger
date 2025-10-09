@@ -433,13 +433,23 @@ async def install_system(install_req: InstallRequest):
     await db.users.insert_one(admin_dict)
     
     # Create system settings
-    settings = {
-        "id": str(uuid.uuid4()),
-        "server_name": install_req.server_name,
-        "installed_at": datetime.now(timezone.utc).isoformat(),
-        "version": "1.0.0"
-    }
-    await db.settings.insert_one(settings)
+    server_settings = ServerSettings(
+        server_name=install_req.server_name,
+        connection_type=install_req.connection_type,
+        domain=install_req.domain,
+        ip_address=install_req.ip_address,
+        ssl_enabled=install_req.auto_ssl,
+        ssl_auto_renew=install_req.auto_ssl
+    )
+    
+    settings_dict = server_settings.model_dump()
+    settings_dict['updated_at'] = settings_dict['updated_at'].isoformat()
+    if settings_dict.get('ssl_expires_at'):
+        settings_dict['ssl_expires_at'] = settings_dict['ssl_expires_at'].isoformat()
+    settings_dict['installed_at'] = datetime.now(timezone.utc).isoformat()
+    settings_dict['version'] = "1.0.0"
+    
+    await db.server_settings.insert_one(settings_dict)
     
     return InstallStatus(
         installed=True,
