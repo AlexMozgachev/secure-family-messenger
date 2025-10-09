@@ -193,13 +193,13 @@ const AdminDashboard = ({ onLogout }) => {
                     {t('dashboard')}
                   </Button>
                 </Link>
-                <Link to="/admin/security">
+                <Link to="/admin/settings">
                   <Button
-                    variant={isActive('/admin/security') ? 'default' : 'ghost'}
-                    className={isActive('/admin/security') ? 'bg-slate-700' : 'text-slate-300 hover:bg-slate-800'}
+                    variant={isActive('/admin/settings') ? 'default' : 'ghost'}
+                    className={isActive('/admin/settings') ? 'bg-slate-700' : 'text-slate-300 hover:bg-slate-800'}
                   >
-                    <Shield className="w-4 h-4 mr-2" />
-                    {t('security')}
+                    <SettingsIcon className="w-4 h-4 mr-2" />
+                    {t('settings')}
                   </Button>
                 </Link>
               </nav>
