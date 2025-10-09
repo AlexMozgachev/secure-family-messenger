@@ -77,6 +77,7 @@ function App() {
 
   return (
     <div className="App">
+      <Toaster position="top-right" richColors />
       <BrowserRouter>
         <Routes>
           <Route
