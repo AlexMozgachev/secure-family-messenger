@@ -490,6 +490,15 @@ const AdminDashboard = ({ onLogout }) => {
                           <Button
                             size="sm"
                             variant="outline"
+                            className="border-blue-600 text-blue-400 hover:bg-blue-900/20"
+                            onClick={() => handleViewUserDevices(user)}
+                            data-testid={`view-devices-btn-${user.username}`}
+                          >
+                            <Monitor className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
                             className={user.is_blocked ? 'border-emerald-600 text-emerald-400 hover:bg-emerald-900/20' : 'border-red-600 text-red-400 hover:bg-red-900/20'}
                             onClick={() => handleBlockUser(user.id, user.is_blocked)}
                             disabled={user.is_admin}
