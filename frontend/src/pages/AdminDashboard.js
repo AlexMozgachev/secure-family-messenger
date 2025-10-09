@@ -156,6 +156,40 @@ const AdminDashboard = ({ onLogout }) => {
     localStorage.setItem('language', newLang);
   };
 
+  const handleViewUserDevices = async (user) => {
+    setSelectedUser(user);
+    setShowUserDevices(true);
+    setDevicesLoading(true);
+    setUserDevices([]);
+    
+    try {
+      const response = await axios.get(`${API}/users/${user.id}/devices`);
+      setUserDevices(response.data);
+    } catch (error) {
+      console.error('Error loading user devices:', error);
+      toast.error('Ошибка загрузки устройств пользователя');
+    } finally {
+      setDevicesLoading(false);
+    }
+  };
+
+  const handleDisconnectUserDevice = async (sessionId) => {
+    if (!window.confirm('Отключить это устройство?')) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${API}/devices/${sessionId}`);
+      toast.success('Устройство отключено');
+      // Перезагрузить список устройств
+      if (selectedUser) {
+        handleViewUserDevices(selectedUser);
+      }
+    } catch (error) {
+      toast.error('Ошибка отключения устройства');
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'Никогда';
     const date = new Date(dateString);
