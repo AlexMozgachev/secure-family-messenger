@@ -121,6 +121,13 @@ const Security = ({ language, t }) => {
           <h2 className="text-2xl font-bold text-white">{t('security')}</h2>
           <p className="text-slate-400">Управление безопасностью системы</p>
         </div>
+        <Button
+          onClick={() => {/* Will scroll to devices tab */ setActiveTab && setActiveTab('devices'); }}
+          className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white"
+        >
+          <Monitor className="w-4 h-4 mr-2" />
+          {t('connected_devices')}
+        </Button>
       </div>
 
       <Tabs defaultValue="blocked-ips" className="w-full">
