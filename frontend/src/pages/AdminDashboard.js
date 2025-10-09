@@ -297,6 +297,13 @@ const AdminDashboard = ({ onLogout }) => {
           </Card>
         </div>
 
+        {/* System Monitoring */}
+        <SystemMonitoring 
+          language={language} 
+          t={t} 
+          onViewDevices={() => window.open('/admin/settings', '_blank')} 
+        />
+
         {/* Users Table */}
         <Card className="glass border-slate-700">
           <CardHeader>
