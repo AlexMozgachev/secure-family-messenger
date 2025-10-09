@@ -474,7 +474,7 @@ const AdminDashboard = ({ onLogout }) => {
         </Card>
             </>
           } />
-          <Route path="/security" element={<Security language={language} t={t} />} />
+          <Route path="/settings" element={<Settings language={language} t={t} />} />
         </Routes>
       </main>
 
