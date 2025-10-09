@@ -823,13 +823,157 @@ async def admin_get_stats(current_admin: User = Depends(get_current_admin)):
     total_rooms = await db.rooms.count_documents({})
     total_messages = await db.messages.count_documents({})
     blocked_users = await db.users.count_documents({"is_blocked": True})
+    blocked_ips_count = await db.blocked_ips.count_documents({})
+    active_sessions = await db.device_sessions.count_documents({})
     
     return {
         "total_users": total_users,
         "total_rooms": total_rooms,
         "total_messages": total_messages,
-        "blocked_users": blocked_users
+        "blocked_users": blocked_users,
+        "blocked_ips": blocked_ips_count,
+        "active_sessions": active_sessions
     }
+
+# ==================== SECURITY ENDPOINTS ====================
+
+@api_router.get("/admin/security/blocked-ips")
+async def get_blocked_ips(current_admin: User = Depends(get_current_admin)):
+    """Admin: Get all blocked IPs"""
+    blocked = await db.blocked_ips.find({}, {"_id": 0}).sort("blocked_at", -1).to_list(1000)
+    
+    for item in blocked:
+        if isinstance(item.get('blocked_at'), str):
+            item['blocked_at'] = datetime.fromisoformat(item['blocked_at'])
+        if isinstance(item.get('expires_at'), str):
+            item['expires_at'] = datetime.fromisoformat(item['expires_at'])
+    
+    return blocked
+
+@api_router.post("/admin/security/block-ips")
+async def block_ips(block_request: IPBlockRequest, current_admin: User = Depends(get_current_admin)):
+    """Admin: Block IP addresses"""
+    blocked_count = 0
+    
+    for ip in block_request.ip_addresses:
+        # Check if already blocked
+        existing = await db.blocked_ips.find_one({"ip_address": ip})
+        if existing:
+            continue
+        
+        expires_at = None
+        if block_request.expires_hours:
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=block_request.expires_hours)
+        
+        blocked_ip = BlockedIP(
+            ip_address=ip,
+            reason=block_request.reason,
+            blocked_by=current_admin.id,
+            expires_at=expires_at
+        )
+        
+        blocked_dict = blocked_ip.model_dump()
+        blocked_dict['blocked_at'] = blocked_dict['blocked_at'].isoformat()
+        if blocked_dict.get('expires_at'):
+            blocked_dict['expires_at'] = blocked_dict['expires_at'].isoformat()
+        
+        await db.blocked_ips.insert_one(blocked_dict)
+        blocked_count += 1
+    
+    return {"message": f"Blocked {blocked_count} IP address(es)", "count": blocked_count}
+
+@api_router.delete("/admin/security/blocked-ips/{ip_id}")
+async def unblock_ip(ip_id: str, current_admin: User = Depends(get_current_admin)):
+    """Admin: Unblock IP address"""
+    result = await db.blocked_ips.delete_one({"id": ip_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Blocked IP not found")
+    
+    return {"message": "IP unblocked successfully"}
+
+@api_router.get("/admin/security/login-attempts")
+async def get_login_attempts(limit: int = 100, current_admin: User = Depends(get_current_admin)):
+    """Admin: Get recent login attempts"""
+    attempts = await db.login_attempts.find({}, {"_id": 0}).sort("attempted_at", -1).limit(limit).to_list(limit)
+    
+    for attempt in attempts:
+        if isinstance(attempt.get('attempted_at'), str):
+            attempt['attempted_at'] = datetime.fromisoformat(attempt['attempted_at'])
+    
+    return attempts
+
+# ==================== DEVICE SESSIONS ENDPOINTS ====================
+
+@api_router.get("/users/{user_id}/devices")
+async def get_user_devices(user_id: str, current_user: User = Depends(get_current_user)):
+    """Get user's device sessions"""
+    # Check access (admin or self)
+    if not current_user.is_admin and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    sessions = await db.device_sessions.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).sort("last_active", -1).limit(10).to_list(10)
+    
+    for session in sessions:
+        if isinstance(session.get('last_active'), str):
+            session['last_active'] = datetime.fromisoformat(session['last_active'])
+        if isinstance(session.get('gps_updated_at'), str):
+            session['gps_updated_at'] = datetime.fromisoformat(session['gps_updated_at'])
+    
+    return sessions
+
+@api_router.put("/devices/{session_id}/gps")
+async def update_device_gps(session_id: str, gps_update: GPSUpdate, current_user: User = Depends(get_current_user)):
+    """Update device GPS location"""
+    session = await db.device_sessions.find_one({"id": session_id})
+    if not session:
+        raise HTTPException(status_code=404, detail="Device session not found")
+    
+    # Check access
+    if session['user_id'] != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    await db.device_sessions.update_one(
+        {"id": session_id},
+        {"$set": {
+            "gps_latitude": gps_update.latitude,
+            "gps_longitude": gps_update.longitude,
+            "gps_updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "GPS location updated"}
+
+@api_router.get("/admin/devices")
+async def get_all_devices(current_admin: User = Depends(get_current_admin)):
+    """Admin: Get all device sessions"""
+    sessions = await db.device_sessions.find({}, {"_id": 0}).sort("last_active", -1).to_list(1000)
+    
+    for session in sessions:
+        if isinstance(session.get('last_active'), str):
+            session['last_active'] = datetime.fromisoformat(session['last_active'])
+        if isinstance(session.get('gps_updated_at'), str):
+            session['gps_updated_at'] = datetime.fromisoformat(session['gps_updated_at'])
+    
+    return sessions
+
+@api_router.delete("/devices/{session_id}")
+async def delete_device_session(session_id: str, current_user: User = Depends(get_current_user)):
+    """Delete device session (logout device)"""
+    session = await db.device_sessions.find_one({"id": session_id})
+    if not session:
+        raise HTTPException(status_code=404, detail="Device session not found")
+    
+    # Check access (admin or self)
+    if not current_user.is_admin and session['user_id'] != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    await db.device_sessions.delete_one({"id": session_id})
+    
+    return {"message": "Device session deleted"}
 
 # ==================== WEBSOCKET ====================
 
