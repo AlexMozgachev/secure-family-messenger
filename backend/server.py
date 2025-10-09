@@ -451,19 +451,36 @@ async def register(user_create: UserCreate):
     return TokenResponse(access_token=access_token, user=user)
 
 @api_router.post("/auth/login", response_model=TokenResponse)
-async def login(user_login: UserLogin):
+async def login(user_login: UserLogin, request: Request):
     """Login user"""
+    client_ip = get_client_ip(request)
+    user_agent = request.headers.get('User-Agent', 'Unknown')
+    
+    # Check if IP is blocked
+    if await check_ip_blocked(client_ip):
+        raise HTTPException(status_code=403, detail="IP address is blocked due to suspicious activity")
+    
     user_data = await db.users.find_one({"username": user_login.username}, {"_id": 0})
     if not user_data:
+        await record_login_attempt(client_ip, user_login.username, False, user_agent)
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Verify password
     if not pwd_context.verify(user_login.password, user_data['password']):
+        blocked = await record_login_attempt(client_ip, user_login.username, False, user_agent)
+        if blocked:
+            raise HTTPException(status_code=403, detail="Too many failed attempts. IP blocked for 1 hour.")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Check if blocked
     if user_data.get('is_blocked', False):
         raise HTTPException(status_code=403, detail="Account is blocked")
+    
+    # Record successful login
+    await record_login_attempt(client_ip, user_login.username, True, user_agent)
+    
+    # Create or update device session
+    await create_or_update_device_session(user_data['id'], client_ip, user_agent)
     
     # Update last login
     await db.users.update_one(
