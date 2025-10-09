@@ -31,6 +31,11 @@ SECRET_KEY = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production-
 ALGORITHM = "HS256"
 security = HTTPBearer()
 
+# Security settings
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_ATTEMPT_WINDOW = 900  # 15 minutes in seconds
+IP_BLOCK_DURATION = 3600  # 1 hour in seconds
+
 # Create the main app
 app = FastAPI(title="Secure Messenger API")
 api_router = APIRouter(prefix="/api")
