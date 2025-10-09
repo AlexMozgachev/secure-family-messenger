@@ -206,13 +206,13 @@ setup_backend() {
     fi
     deactivate
     
-    # Создание .env файла
+    # Создание .env файла (используем localhost)
     cat > .env << EOF
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=secure_messenger
 CORS_ORIGINS=*
 JWT_SECRET=$(openssl rand -base64 32)
-FRONTEND_URL=http://$SERVER_IP:3000
+FRONTEND_URL=http://127.0.0.1:3000
 EOF
     
     print_success "Backend настроен"
