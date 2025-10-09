@@ -367,7 +367,7 @@ const Installer = ({ onComplete }) => {
 
               <div className="flex space-x-3">
                 <Button
-                  onClick={() => setStep(1)}
+                  onClick={() => setStep(2)}
                   variant="outline"
                   className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800 py-6"
                 >
@@ -384,8 +384,8 @@ const Installer = ({ onComplete }) => {
             </div>
           )}
 
-          {/* Step 3: Confirm Installation */}
-          {step === 3 && (
+          {/* Step 4: Confirm Installation */}
+          {step === 4 && (
             <div className="space-y-6 animate-fadeIn">
               <div className="text-center space-y-2">
                 <h3 className="text-2xl font-semibold text-white">Подтверждение установки</h3>
