@@ -620,6 +620,23 @@ async def admin_reset_password(user_id: str, new_password: str = Form(...), curr
     
     return {"message": "Password reset successfully"}
 
+@api_router.put("/admin/users/{user_id}/role")
+async def admin_change_role(user_id: str, is_admin: bool = Form(...), current_admin: User = Depends(get_current_admin)):
+    """Admin: Change user role"""
+    # Prevent self role change
+    if user_id == current_admin.id:
+        raise HTTPException(status_code=400, detail="Cannot change your own role")
+    
+    result = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"is_admin": is_admin}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "Role changed successfully"}
+
 @api_router.get("/admin/stats")
 async def admin_get_stats(current_admin: User = Depends(get_current_admin)):
     """Admin: Get system statistics"""
