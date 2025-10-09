@@ -108,6 +108,22 @@ const Settings = ({ language, t }) => {
     }
   };
 
+  const handleInstallSSL = async () => {
+    if (!window.confirm(t('confirm_ssl_install'))) {
+      return;
+    }
+
+    try {
+      toast.info(t('ssl_installing'));
+      const response = await axios.post(`${API}/admin/ssl/install`);
+      toast.success(t('ssl_installed_successfully'));
+      loadData(); // Обновляем данные после установки
+    } catch (error) {
+      console.error('SSL installation error:', error);
+      toast.error(error.response?.data?.detail || t('ssl_install_error'));
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return t('never');
     const date = new Date(dateString);
