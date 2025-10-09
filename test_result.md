@@ -135,6 +135,18 @@ backend:
         agent: "testing"
         comment: "Comprehensive testing completed - All security APIs working perfectly: GET /api/admin/security/blocked-ips (list blocked IPs), POST /api/admin/security/block-ips (block IPs), DELETE /api/admin/security/blocked-ips/{id} (unblock IPs), GET /api/admin/devices (device sessions), DELETE /api/devices/{session_id} (device logout), GET /api/admin/security/login-attempts (login history). All endpoints properly authenticated, handle errors correctly (404 for non-existent resources), and maintain security."
 
+  - task: "System monitoring API endpoint"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "NEW ENDPOINT TESTING COMPLETED - GET /api/admin/system/monitoring endpoint working perfectly. Comprehensive testing verified: 1) Proper admin authentication required (403 without auth), 2) Complete response structure with all required fields (cpu, memory, disk, network, system), 3) Data validation passed for all numeric values and types, 4) CPU data includes percent usage, cores count, and load averages, 5) Memory data shows used/total GB and percentage, 6) Disk usage with used/total GB and percentage, 7) Network statistics with sent/received/total MB, 8) System uptime in hours and timestamp. All values are reasonable and properly formatted. Authentication, response format, data validation, and error handling all working correctly."
+
 frontend:
   - task: "Replace Security navigation with Settings navigation"
     implemented: true
