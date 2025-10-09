@@ -37,6 +37,16 @@ const Installer = ({ onComplete }) => {
 
   const validateStep = () => {
     if (step === 2) {
+      if (formData.connection_type === 'domain' && !formData.domain) {
+        setError('Введите домен');
+        return false;
+      }
+      if (formData.connection_type === 'ip' && !formData.ip_address) {
+        setError('Введите IP адрес');
+        return false;
+      }
+    }
+    if (step === 3) {
       if (!formData.admin_username || !formData.admin_password) {
         setError('Логин и пароль обязательны');
         return false;
