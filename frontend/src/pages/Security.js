@@ -115,32 +115,32 @@ const Security = ({ language, t }) => {
   }
 
   return (
-    <div className=\"space-y-6\">
-      <div className=\"flex items-center justify-between\">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className=\"text-2xl font-bold text-white\">{t('security')}</h2>
-          <p className=\"text-slate-400\">Управление безопасностью системы</p>
+          <h2 className="text-2xl font-bold text-white">{t('security')}</h2>
+          <p className="text-slate-400">Управление безопасностью системы</p>
         </div>
       </div>
 
-      <Tabs defaultValue=\"blocked-ips\" className=\"w-full\">
-        <TabsList className=\"glass border-slate-700\">
-          <TabsTrigger value=\"blocked-ips\" className=\"data-[state=active]:bg-slate-700\">
-            <Ban className=\"w-4 h-4 mr-2\" />
+      <Tabs defaultValue="blocked-ips" className="w-full">
+        <TabsList className="glass border-slate-700">
+          <TabsTrigger value="blocked-ips" className="data-[state=active]:bg-slate-700">
+            <Ban className="w-4 h-4 mr-2" />
             {t('blocked_ips')}
           </TabsTrigger>
-          <TabsTrigger value=\"devices\" className=\"data-[state=active]:bg-slate-700\">
-            <Monitor className=\"w-4 h-4 mr-2\" />
+          <TabsTrigger value="devices" className="data-[state=active]:bg-slate-700">
+            <Monitor className="w-4 h-4 mr-2" />
             {t('active_devices')}
           </TabsTrigger>
-          <TabsTrigger value=\"attempts\" className=\"data-[state=active]:bg-slate-700\">
-            <AlertTriangle className=\"w-4 h-4 mr-2\" />
+          <TabsTrigger value="attempts" className="data-[state=active]:bg-slate-700">
+            <AlertTriangle className="w-4 h-4 mr-2" />
             {t('login_attempts')}
           </TabsTrigger>
         </TabsList>
 
         {/* Blocked IPs */}
-        <TabsContent value=\"blocked-ips\" className=\"space-y-4\">
+        <TabsContent value="blocked-ips" className="space-y-4">
           <Card className=\"glass border-slate-700\">
             <CardHeader>
               <div className=\"flex items-center justify-between\">
