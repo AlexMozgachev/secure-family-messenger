@@ -251,8 +251,8 @@ netstat -tlnp | grep -E ':3000|:8001|:27017' || echo "Сервисы еще за
 
 print_success "Исправление завершено!"
 
-SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s ipinfo.io/ip 2>/dev/null || hostname -I | awk '{print $1}')
-[ -z "$SERVER_IP" ] && SERVER_IP="localhost"
+# Используем localhost для простоты доступа
+SERVER_IP="127.0.0.1"
 
 echo ""
 echo -e "${GREEN}================================================================${NC}"
