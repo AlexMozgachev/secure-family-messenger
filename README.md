@@ -40,20 +40,25 @@
 
 ## 🚀 Быстрая установка
 
-### ⚡ Автоматическая установка Ubuntu 20.04 (рекомендуется)
+### ⚡ Ubuntu 22.04 LTS (рекомендуется) 🔥
 
 ```bash
-# Одной командой на чистом Ubuntu 20.04
-curl -fsSL https://raw.githubusercontent.com/DenKedr/Secure-Messenger-Builder/main/install_ubuntu.sh | sudo bash
+# Оптимизированная установка для Ubuntu 22.04 LTS
+curl -fsSL https://raw.githubusercontent.com/DenKedr/Secure-Messenger-Builder/main/install_ubuntu22.sh | sudo bash
 ```
 
-**Что установится автоматически:**
-- Python 3, Node.js 18, MongoDB 4.4
-- Все зависимости и конфигурация
-- Системные сервисы с автозапуском  
-- Настроенный файрвол
+**Преимущества Ubuntu 22.04:**
+- Python 3.10, Node.js 20, MongoDB 6.0 из коробки
+- Полная совместимость всех зависимостей
+- LTS поддержка до 2027 года
+- **Время установки: 3-7 минут**
 
-**Время установки:** 5-10 минут
+### ⚙️ Ubuntu 20.04 (совместимость)
+
+```bash  
+# Для Ubuntu 20.04 (с исправлениями совместимости)
+curl -fsSL https://raw.githubusercontent.com/DenKedr/Secure-Messenger-Builder/main/install_ubuntu.sh | sudo bash
+```
 
 **После установки доступно:**
 - 🌐 Веб-интерфейс: `http://YOUR_SERVER_IP:3000`
