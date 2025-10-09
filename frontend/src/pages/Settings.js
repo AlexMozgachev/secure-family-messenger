@@ -270,22 +270,36 @@ const Settings = ({ language, t }) => {
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => handleRenewSSL(true)}
-                  className="flex-1 bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-600 hover:to-cyan-700 text-white"
-                >
-                  <Shield className="w-4 h-4 mr-2" />
-                  {t('renew_domain_ssl')}
-                </Button>
-                <Button
-                  onClick={() => handleRenewSSL(false)}
-                  variant="outline"
-                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800"
-                >
-                  <Shield className="w-4 h-4 mr-2" />
-                  {t('renew_ip_ssl')}
-                </Button>
+              <div className="space-y-3">
+                {!settings?.ssl_enabled && (
+                  <Button
+                    onClick={() => handleInstallSSL()}
+                    className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    {t('install_ssl_certificate')}
+                  </Button>
+                )}
+                
+                {settings?.ssl_enabled && (
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => handleRenewSSL(true)}
+                      className="flex-1 bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-600 hover:to-cyan-700 text-white"
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      {t('renew_domain_ssl')}
+                    </Button>
+                    <Button
+                      onClick={() => handleRenewSSL(false)}
+                      variant="outline"
+                      className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800"
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      {t('renew_ip_ssl')}
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <Button
