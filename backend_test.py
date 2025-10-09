@@ -361,6 +361,151 @@ class SettingsAPITester:
         except Exception as e:
             self.log_test("Health Check", False, f"Request error: {str(e)}")
     
+    def test_system_monitoring(self):
+        """Test GET /api/admin/system/monitoring - NEW ENDPOINT"""
+        try:
+            response = self.session.get(f"{BASE_URL}/admin/system/monitoring")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Check for required top-level keys
+                required_keys = ["cpu", "memory", "disk", "network", "system"]
+                missing_keys = [key for key in required_keys if key not in data]
+                
+                if missing_keys:
+                    self.log_test("System Monitoring", False, f"Missing required keys: {missing_keys}", data)
+                    return
+                
+                # Validate CPU data
+                cpu_data = data.get("cpu", {})
+                cpu_required = ["percent", "cores"]
+                cpu_missing = [key for key in cpu_required if key not in cpu_data]
+                
+                # Validate Memory data
+                memory_data = data.get("memory", {})
+                memory_required = ["used_gb", "total_gb", "percent"]
+                memory_missing = [key for key in memory_required if key not in memory_data]
+                
+                # Validate Disk data
+                disk_data = data.get("disk", {})
+                disk_required = ["used_gb", "total_gb", "percent"]
+                disk_missing = [key for key in disk_required if key not in disk_data]
+                
+                # Validate Network data
+                network_data = data.get("network", {})
+                network_required = ["sent_mb", "received_mb", "total_mb"]
+                network_missing = [key for key in network_required if key not in network_data]
+                
+                # Validate System data
+                system_data = data.get("system", {})
+                system_required = ["uptime_hours", "timestamp"]
+                system_missing = [key for key in system_required if key not in system_data]
+                
+                # Check for any missing fields
+                all_missing = []
+                if cpu_missing:
+                    all_missing.extend([f"cpu.{key}" for key in cpu_missing])
+                if memory_missing:
+                    all_missing.extend([f"memory.{key}" for key in memory_missing])
+                if disk_missing:
+                    all_missing.extend([f"disk.{key}" for key in disk_missing])
+                if network_missing:
+                    all_missing.extend([f"network.{key}" for key in network_missing])
+                if system_missing:
+                    all_missing.extend([f"system.{key}" for key in system_missing])
+                
+                if all_missing:
+                    self.log_test("System Monitoring", False, f"Missing required fields: {all_missing}", data)
+                    return
+                
+                # Validate data types and reasonable values
+                validation_errors = []
+                
+                # CPU validation
+                if not isinstance(cpu_data.get("percent"), (int, float)) or cpu_data.get("percent") < 0 or cpu_data.get("percent") > 100:
+                    validation_errors.append("cpu.percent should be 0-100")
+                if not isinstance(cpu_data.get("cores"), int) or cpu_data.get("cores") <= 0:
+                    validation_errors.append("cpu.cores should be positive integer")
+                
+                # Memory validation
+                if not isinstance(memory_data.get("used_gb"), (int, float)) or memory_data.get("used_gb") < 0:
+                    validation_errors.append("memory.used_gb should be non-negative")
+                if not isinstance(memory_data.get("total_gb"), (int, float)) or memory_data.get("total_gb") <= 0:
+                    validation_errors.append("memory.total_gb should be positive")
+                if not isinstance(memory_data.get("percent"), (int, float)) or memory_data.get("percent") < 0 or memory_data.get("percent") > 100:
+                    validation_errors.append("memory.percent should be 0-100")
+                
+                # Disk validation
+                if not isinstance(disk_data.get("used_gb"), (int, float)) or disk_data.get("used_gb") < 0:
+                    validation_errors.append("disk.used_gb should be non-negative")
+                if not isinstance(disk_data.get("total_gb"), (int, float)) or disk_data.get("total_gb") <= 0:
+                    validation_errors.append("disk.total_gb should be positive")
+                if not isinstance(disk_data.get("percent"), (int, float)) or disk_data.get("percent") < 0 or disk_data.get("percent") > 100:
+                    validation_errors.append("disk.percent should be 0-100")
+                
+                # Network validation
+                if not isinstance(network_data.get("sent_mb"), (int, float)) or network_data.get("sent_mb") < 0:
+                    validation_errors.append("network.sent_mb should be non-negative")
+                if not isinstance(network_data.get("received_mb"), (int, float)) or network_data.get("received_mb") < 0:
+                    validation_errors.append("network.received_mb should be non-negative")
+                if not isinstance(network_data.get("total_mb"), (int, float)) or network_data.get("total_mb") < 0:
+                    validation_errors.append("network.total_mb should be non-negative")
+                
+                # System validation
+                if not isinstance(system_data.get("uptime_hours"), (int, float)) or system_data.get("uptime_hours") < 0:
+                    validation_errors.append("system.uptime_hours should be non-negative")
+                if not isinstance(system_data.get("timestamp"), str):
+                    validation_errors.append("system.timestamp should be string")
+                
+                if validation_errors:
+                    self.log_test("System Monitoring", False, f"Data validation errors: {validation_errors}", data)
+                    return
+                
+                # Success - log the monitoring data
+                self.log_test("System Monitoring", True, "Successfully retrieved system monitoring data", {
+                    "cpu_percent": cpu_data.get("percent"),
+                    "cpu_cores": cpu_data.get("cores"),
+                    "memory_percent": memory_data.get("percent"),
+                    "memory_total_gb": memory_data.get("total_gb"),
+                    "disk_percent": disk_data.get("percent"),
+                    "disk_total_gb": disk_data.get("total_gb"),
+                    "network_total_mb": network_data.get("total_mb"),
+                    "uptime_hours": system_data.get("uptime_hours")
+                })
+                
+            elif response.status_code == 403:
+                self.log_test("System Monitoring", False, "Access denied - admin authentication required", response.text)
+            else:
+                self.log_test("System Monitoring", False, f"HTTP {response.status_code}", response.text)
+                
+        except Exception as e:
+            self.log_test("System Monitoring", False, f"Request error: {str(e)}")
+    
+    def test_system_monitoring_without_auth(self):
+        """Test GET /api/admin/system/monitoring without authentication"""
+        try:
+            # Temporarily remove auth header
+            original_auth = self.session.headers.get("Authorization")
+            if original_auth:
+                del self.session.headers["Authorization"]
+            
+            response = self.session.get(f"{BASE_URL}/admin/system/monitoring")
+            
+            # Restore auth header
+            if original_auth:
+                self.session.headers["Authorization"] = original_auth
+            
+            if response.status_code == 401:
+                self.log_test("System Monitoring Auth Check", True, "Correctly requires authentication (401 Unauthorized)")
+            elif response.status_code == 403:
+                self.log_test("System Monitoring Auth Check", True, "Correctly requires authentication (403 Forbidden)")
+            else:
+                self.log_test("System Monitoring Auth Check", False, f"Should require auth but got HTTP {response.status_code}", response.text)
+                
+        except Exception as e:
+            self.log_test("System Monitoring Auth Check", False, f"Request error: {str(e)}")
+    
     def run_all_tests(self):
         """Run all Settings page related tests"""
         print("🚀 Starting Secure Messenger Settings API Tests")
