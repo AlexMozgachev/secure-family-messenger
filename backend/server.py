@@ -167,6 +167,29 @@ class IPBlockRequest(BaseModel):
     reason: str = "Manual block"
     expires_hours: Optional[int] = None
 
+class ServerSettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    server_name: str
+    connection_type: str = "ip"  # ip or domain
+    domain: Optional[str] = None
+    ip_address: Optional[str] = None
+    ssl_enabled: bool = False
+    ssl_auto_renew: bool = False
+    ssl_expires_at: Optional[datetime] = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class BackupRequest(BaseModel):
+    include_users: bool = True
+    include_messages: bool = True
+    include_settings: bool = True
+
+class RestoreRequest(BaseModel):
+    backup_data: str  # JSON string
+
+class SSLRenewRequest(BaseModel):
+    for_domain: bool = True  # True for domain, False for IP
+
 class InstallRequest(BaseModel):
     admin_username: str
     admin_password: str
