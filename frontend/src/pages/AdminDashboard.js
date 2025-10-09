@@ -108,7 +108,7 @@ const AdminDashboard = ({ onLogout }) => {
 
   const handleResetPassword = async () => {
     if (!newPassword || newPassword.length < 6) {
-      toast.error('Пароль должен быть не менее 6 символов');
+      toast.error(t('password_min_length'));
       return;
     }
 
@@ -117,13 +117,34 @@ const AdminDashboard = ({ onLogout }) => {
       formData.append('new_password', newPassword);
       
       await axios.put(`${API}/admin/users/${selectedUser.id}/password`, formData);
-      toast.success('Пароль изменён успешно');
+      toast.success(t('password_reset'));
       setShowResetPassword(false);
       setNewPassword('');
       setSelectedUser(null);
     } catch (error) {
-      toast.error('Ошибка изменения пароля');
+      toast.error(t('error_operation'));
     }
+  };
+
+  const handleChangeRole = async (makeAdmin) => {
+    try {
+      const formData = new FormData();
+      formData.append('is_admin', makeAdmin);
+      
+      await axios.put(`${API}/admin/users/${selectedUser.id}/role`, formData);
+      toast.success(t('role_changed'));
+      setShowChangeRole(false);
+      setSelectedUser(null);
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || t('error_operation'));
+    }
+  };
+
+  const toggleLanguage = () => {
+    const newLang = language === 'ru' ? 'en' : 'ru';
+    setLanguage(newLang);
+    localStorage.setItem('language', newLang);
   };
 
   const formatDate = (dateString) => {
