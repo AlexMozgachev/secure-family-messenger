@@ -122,7 +122,11 @@ const Security = ({ language, t }) => {
           <p className="text-slate-400">Управление безопасностью системы</p>
         </div>
         <Button
-          onClick={() => {/* Will scroll to devices tab */ setActiveTab && setActiveTab('devices'); }}
+          onClick={() => {
+            // Switch to devices tab
+            const devicesTab = document.querySelector('[value="devices"]');
+            if (devicesTab) devicesTab.click();
+          }}
           className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white"
         >
           <Monitor className="w-4 h-4 mr-2" />
