@@ -24,6 +24,7 @@
 - WebSocket - real-time общение
 - PyJWT - аутентификация
 - Passlib - хеширование паролей
+- PSUtil - системный мониторинг
 
 ### Frontend (Admin Panel)
 - React 19
