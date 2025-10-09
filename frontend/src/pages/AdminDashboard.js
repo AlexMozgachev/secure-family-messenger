@@ -32,6 +32,9 @@ const AdminDashboard = ({ onLogout }) => {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [showChangeRole, setShowChangeRole] = useState(false);
+  const [showUserDevices, setShowUserDevices] = useState(false);
+  const [userDevices, setUserDevices] = useState([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
   const [newUser, setNewUser] = useState({
     username: '',
     password: '',
