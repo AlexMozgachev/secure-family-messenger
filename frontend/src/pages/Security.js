@@ -231,7 +231,7 @@ const Security = ({ language, t }) => {
                         <TableCell className="text-slate-300">{ip.reason}</TableCell>
                         <TableCell className="text-slate-400 text-sm">{formatDate(ip.blocked_at)}</TableCell>
                         <TableCell className="text-slate-400 text-sm">
-                          {ip.expires_at ? formatDate(ip.expires_at) : <Badge variant="outline">{t('permanent')}</Badge>}
+                          {ip.expires_at ? formatDate(ip.expires_at) : <Badge className="bg-slate-600 text-white border-slate-500 font-medium">{t('permanent')}</Badge>}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button size="sm" variant="outline" className="border-emerald-600 text-emerald-400 hover:bg-emerald-900/20" onClick={() => handleUnblockIP(ip.id)}>
