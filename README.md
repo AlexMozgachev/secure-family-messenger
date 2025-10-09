@@ -40,35 +40,31 @@
 
 ## 🚀 Быстрая установка
 
-### ⚡ Ubuntu 22.04 LTS (рекомендуется) 🔥
+### ⚡ Ubuntu 22.04 LTS - Простая установка
 
 ```bash
-# Исправленная установка для Ubuntu 22.04 LTS (IPv4 + без SSL)
-curl -fsSL https://raw.githubusercontent.com/DenKedr/Secure-Messenger-Builder/main/install_ubuntu22_fixed.sh | sudo bash
+# Простая и надежная установка (без SSL, настраивается в админке)
+curl -fsSL https://raw.githubusercontent.com/DenKedr/Secure-Messenger-Builder/main/install_ubuntu22_simple.sh | sudo bash
 ```
 
-```bash
-# Исправление существующей установки (проблемы с IPv6/SSL)
-curl -fsSL https://raw.githubusercontent.com/DenKedr/Secure-Messenger-Builder/main/fix_ipv6_ssl.sh | sudo bash
-```
+**⏱️ Время установки: 3-5 минут**
 
-**Преимущества Ubuntu 22.04:**
-- Python 3.10, Node.js 20, MongoDB 6.0 из коробки
-- Полная совместимость всех зависимостей
-- LTS поддержка до 2027 года
-- **Время установки: 3-7 минут**
+**📦 Что установится:**
+- Python 3.10, Node.js 20, MongoDB 6.0
+- FastAPI + React с современными зависимостями
+- Systemd сервисы с автозапуском
+- Файрвол и базовая безопасность
 
-### ⚙️ Ubuntu 20.04 (совместимость)
-
-```bash  
-# Для Ubuntu 20.04 (с исправлениями совместимости)
-curl -fsSL https://raw.githubusercontent.com/DenKedr/Secure-Messenger-Builder/main/install_ubuntu.sh | sudo bash
-```
+**🔒 SSL сертификаты:**
+- Устанавливаются через админ-панель (Настройки → SSL → Установить SSL)
+- Let's Encrypt интеграция
+- Автоматическое обновление
 
 **После установки доступно:**
 - 🌐 Веб-интерфейс: `http://YOUR_SERVER_IP:3000`
-- 🔧 API: `http://YOUR_SERVER_IP:8001/docs`  
+- 🔧 API документация: `http://YOUR_SERVER_IP:8001/docs`  
 - 👤 Админ-панель: `http://YOUR_SERVER_IP:3000/admin`
+- 🔑 Логин: `admin` / Пароль: `admin123`
 
 ---
 
