@@ -172,6 +172,10 @@ class InstallRequest(BaseModel):
     admin_password: str
     admin_display_name: Optional[str] = None
     server_name: str = "Secure Messenger"
+    connection_type: str = "ip"  # ip or domain
+    domain: Optional[str] = None
+    ip_address: Optional[str] = None
+    auto_ssl: bool = False
 
 class InstallStatus(BaseModel):
     installed: bool
