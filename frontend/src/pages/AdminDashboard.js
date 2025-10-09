@@ -27,6 +27,7 @@ const AdminDashboard = ({ onLogout }) => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showChangeRole, setShowChangeRole] = useState(false);
   const [newUser, setNewUser] = useState({
     username: '',
     password: '',
@@ -34,6 +35,9 @@ const AdminDashboard = ({ onLogout }) => {
   });
   const [newPassword, setNewPassword] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
+  const [language, setLanguage] = useState(localStorage.getItem('language') || 'ru');
+  
+  const t = (key) => translations[language][key] || key;
 
   useEffect(() => {
     const user = localStorage.getItem('user');
