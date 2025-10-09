@@ -232,10 +232,15 @@ setup_frontend() {
     
     cd /opt/Secure-Messenger-Builder/frontend
     
-    # Используем совместимый package.json если есть
-    if [ -f "package_ubuntu22.json" ]; then
+    # Используем чистый package.json без warnings
+    if [ -f "package_clean.json" ]; then
+        cp package.json package.json.backup 2>/dev/null || true
+        cp package_clean.json package.json
+        print_status "Используется оптимизированный package.json"
+    elif [ -f "package_ubuntu22.json" ]; then
         cp package.json package.json.backup 2>/dev/null || true
         cp package_ubuntu22.json package.json
+        print_status "Используется совместимый package.json"
     fi
     
     # Конфигурация
