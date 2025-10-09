@@ -142,6 +142,23 @@ export const translations = {
     'settings_saved': 'Настройки сохранены',
     'ssl_renewed': 'SSL сертификат обновлён',
     
+    // System Monitoring
+    'system_monitoring': 'Мониторинг системы',
+    'system_performance': 'Производительность сервера',
+    'cpu_usage': 'Использование CPU',
+    'memory_usage': 'Использование ОЗУ',
+    'disk_usage': 'Использование диска',
+    'network_traffic': 'Сетевой трафик',
+    'system_uptime': 'Время работы',
+    'load_average': 'Средняя нагрузка',
+    'cores': 'ядер',
+    'sent': 'Отправлено',
+    'received': 'Получено',
+    'total_traffic': 'Общий трафик',
+    'hours': 'часов',
+    'view_devices_list': 'Список устройств',
+    'connected_devices': 'Подключенные устройства',
+    
     // Login Page
     'login_page_title': 'Панель администратора',
     'login_page_desc': 'Войдите для управления мессенджером',
