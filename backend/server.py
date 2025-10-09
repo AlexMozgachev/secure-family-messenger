@@ -242,6 +242,125 @@ async def get_current_admin(current_user: User = Depends(get_current_user)) -> U
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
+# ==================== SECURITY UTILITIES ====================
+
+async def check_ip_blocked(ip_address: str) -> bool:
+    """Check if IP is blocked"""
+    blocked = await db.blocked_ips.find_one({
+        "ip_address": ip_address,
+        "$or": [
+            {"expires_at": None},
+            {"expires_at": {"$gt": datetime.now(timezone.utc).isoformat()}}
+        ]
+    })
+    return blocked is not None
+
+async def record_login_attempt(ip_address: str, username: str, success: bool, user_agent: str = None):
+    """Record login attempt and check for brute force"""
+    attempt = LoginAttempt(
+        ip_address=ip_address,
+        username=username,
+        success=success
+    )
+    
+    attempt_dict = attempt.model_dump()
+    attempt_dict['attempted_at'] = attempt_dict['attempted_at'].isoformat()
+    await db.login_attempts.insert_one(attempt_dict)
+    
+    if not success:
+        # Count failed attempts in the last window
+        window_start = datetime.now(timezone.utc) - timedelta(seconds=LOGIN_ATTEMPT_WINDOW)
+        failed_count = await db.login_attempts.count_documents({
+            "ip_address": ip_address,
+            "success": False,
+            "attempted_at": {"$gte": window_start.isoformat()}
+        })
+        
+        if failed_count >= MAX_LOGIN_ATTEMPTS:
+            # Block IP
+            blocked_ip = BlockedIP(
+                ip_address=ip_address,
+                reason=f"Too many failed login attempts ({failed_count})",
+                blocked_by="system",
+                expires_at=datetime.now(timezone.utc) + timedelta(seconds=IP_BLOCK_DURATION)
+            )
+            
+            blocked_dict = blocked_ip.model_dump()
+            blocked_dict['blocked_at'] = blocked_dict['blocked_at'].isoformat()
+            if blocked_dict.get('expires_at'):
+                blocked_dict['expires_at'] = blocked_dict['expires_at'].isoformat()
+            
+            await db.blocked_ips.insert_one(blocked_dict)
+            return True
+    
+    return False
+
+async def create_or_update_device_session(user_id: str, ip_address: str, user_agent: str):
+    """Create or update device session"""
+    import re
+    
+    # Parse device name from user agent
+    device_name = "Unknown Device"
+    if user_agent:
+        if 'iPhone' in user_agent:
+            device_name = "iPhone"
+        elif 'iPad' in user_agent:
+            device_name = "iPad"
+        elif 'Android' in user_agent:
+            device_name = "Android Device"
+        elif 'Windows' in user_agent:
+            device_name = "Windows PC"
+        elif 'Macintosh' in user_agent:
+            device_name = "Mac"
+        elif 'Linux' in user_agent:
+            device_name = "Linux"
+    
+    # Check if session exists
+    existing = await db.device_sessions.find_one({
+        "user_id": user_id,
+        "ip_address": ip_address
+    })
+    
+    if existing:
+        # Update last active
+        await db.device_sessions.update_one(
+            {"id": existing['id']},
+            {"$set": {
+                "last_active": datetime.now(timezone.utc).isoformat(),
+                "user_agent": user_agent
+            }}
+        )
+    else:
+        # Create new session
+        session = DeviceSession(
+            user_id=user_id,
+            device_name=device_name,
+            ip_address=ip_address,
+            user_agent=user_agent or "Unknown"
+        )
+        
+        session_dict = session.model_dump()
+        session_dict['last_active'] = session_dict['last_active'].isoformat()
+        if session_dict.get('gps_updated_at'):
+            session_dict['gps_updated_at'] = session_dict['gps_updated_at'].isoformat()
+        
+        await db.device_sessions.insert_one(session_dict)
+
+def get_client_ip(request) -> str:
+    """Get client IP from request"""
+    # Check X-Forwarded-For header first (for proxies)
+    forwarded = request.headers.get('X-Forwarded-For')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    
+    # Check X-Real-IP header
+    real_ip = request.headers.get('X-Real-IP')
+    if real_ip:
+        return real_ip
+    
+    # Fall back to direct client
+    return request.client.host if request.client else "unknown"
+
 # ==================== INSTALLATION ENDPOINTS ====================
 
 @api_router.get("/install/status", response_model=InstallStatus)
