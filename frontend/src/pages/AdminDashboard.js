@@ -212,7 +212,7 @@ const AdminDashboard = ({ onLogout }) => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-400 text-sm font-medium">Пользователей</p>
+                  <p className="text-slate-400 text-sm font-medium">{t('users')}</p>
                   <p className="text-3xl font-bold text-white mt-1" data-testid="stat-total-users">{stats.total_users}</p>
                 </div>
                 <div className="w-12 h-12 bg-cyan-500/10 rounded-lg flex items-center justify-center">
@@ -226,7 +226,7 @@ const AdminDashboard = ({ onLogout }) => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-400 text-sm font-medium">Чатов</p>
+                  <p className="text-slate-400 text-sm font-medium">{t('rooms')}</p>
                   <p className="text-3xl font-bold text-white mt-1" data-testid="stat-total-rooms">{stats.total_rooms}</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-500/10 rounded-lg flex items-center justify-center">
@@ -240,7 +240,7 @@ const AdminDashboard = ({ onLogout }) => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-400 text-sm font-medium">Сообщений</p>
+                  <p className="text-slate-400 text-sm font-medium">{t('messages')}</p>
                   <p className="text-3xl font-bold text-white mt-1" data-testid="stat-total-messages">{stats.total_messages}</p>
                 </div>
                 <div className="w-12 h-12 bg-emerald-500/10 rounded-lg flex items-center justify-center">
@@ -254,7 +254,7 @@ const AdminDashboard = ({ onLogout }) => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-400 text-sm font-medium">Заблокировано</p>
+                  <p className="text-slate-400 text-sm font-medium">{t('blocked')}</p>
                   <p className="text-3xl font-bold text-white mt-1" data-testid="stat-blocked-users">{stats.blocked_users}</p>
                 </div>
                 <div className="w-12 h-12 bg-red-500/10 rounded-lg flex items-center justify-center">
