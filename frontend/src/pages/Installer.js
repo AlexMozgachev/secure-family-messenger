@@ -148,7 +148,7 @@ const Installer = ({ onComplete }) => {
         <CardContent className="space-y-8">
           {/* Step Indicator */}
           <div className="flex items-center justify-center space-x-2">
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div key={s} className="flex items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
@@ -161,7 +161,7 @@ const Installer = ({ onComplete }) => {
                 >
                   {s < step ? <CheckCircle2 className="w-5 h-5" /> : s}
                 </div>
-                {s < 3 && (
+                {s < 4 && (
                   <div
                     className={`w-12 h-1 mx-1 transition-all ${
                       s < step ? 'bg-emerald-500' : 'bg-slate-700'
