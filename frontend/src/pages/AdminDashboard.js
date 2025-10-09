@@ -18,6 +18,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const AdminDashboard = ({ onLogout }) => {
+  const location = useLocation();
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState({
     total_users: 0,
@@ -40,6 +41,8 @@ const AdminDashboard = ({ onLogout }) => {
   const [language, setLanguage] = useState(localStorage.getItem('language') || 'ru');
   
   const t = (key) => translations[language][key] || key;
+  
+  const isActive = (path) => location.pathname === path;
 
   useEffect(() => {
     const user = localStorage.getItem('user');
