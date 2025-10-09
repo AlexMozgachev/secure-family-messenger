@@ -472,6 +472,10 @@ const AdminDashboard = ({ onLogout }) => {
             </div>
           </CardContent>
         </Card>
+            </>
+          } />
+          <Route path="/security" element={<Security language={language} t={t} />} />
+        </Routes>
       </main>
 
       {/* Reset Password Dialog */}
