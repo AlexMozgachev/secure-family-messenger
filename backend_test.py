@@ -541,6 +541,10 @@ class SettingsAPITester:
         devices = self.test_admin_devices()
         self.test_device_deletion(devices)
         
+        print("\n📊 Testing System Monitoring APIs...")
+        self.test_system_monitoring_without_auth()
+        self.test_system_monitoring()
+        
         # Summary
         print("\n" + "=" * 60)
         print("📈 TEST SUMMARY")
