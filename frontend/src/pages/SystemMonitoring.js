@@ -94,15 +94,6 @@ const SystemMonitoring = ({ language, t, onViewDevices }) => {
             <Activity className="w-4 h-4 mr-2" />
             {autoRefresh ? 'Автообновление' : 'Обновить'}
           </Button>
-          <Button
-            onClick={onViewDevices}
-            variant="outline"
-            className="border-slate-600 text-slate-300 hover:bg-slate-800"
-            size="sm"
-          >
-            <Monitor className="w-4 h-4 mr-2" />
-            {t('view_devices_list')}
-          </Button>
         </div>
       </div>
 
