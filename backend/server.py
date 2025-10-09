@@ -124,6 +124,44 @@ class KeyBundle(BaseModel):
     public_key: str
     uploaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class BlockedIP(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ip_address: str
+    reason: str = "Failed login attempts"
+    blocked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    blocked_by: Optional[str] = None  # admin user_id or 'system'
+    expires_at: Optional[datetime] = None
+
+class DeviceSession(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    device_name: str
+    ip_address: str
+    user_agent: str
+    last_active: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    gps_latitude: Optional[float] = None
+    gps_longitude: Optional[float] = None
+    gps_updated_at: Optional[datetime] = None
+
+class LoginAttempt(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    ip_address: str
+    username: Optional[str] = None
+    success: bool
+    attempted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class GPSUpdate(BaseModel):
+    latitude: float
+    longitude: float
+
+class IPBlockRequest(BaseModel):
+    ip_addresses: List[str]
+    reason: str = "Manual block"
+    expires_hours: Optional[int] = None
+
 class InstallRequest(BaseModel):
     admin_username: str
     admin_password: str
