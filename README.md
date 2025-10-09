@@ -43,8 +43,13 @@
 ### ⚡ Ubuntu 22.04 LTS (рекомендуется) 🔥
 
 ```bash
-# Оптимизированная установка для Ubuntu 22.04 LTS
-curl -fsSL https://raw.githubusercontent.com/DenKedr/Secure-Messenger-Builder/main/install_ubuntu22.sh | sudo bash
+# Исправленная установка для Ubuntu 22.04 LTS (IPv4 + без SSL)
+curl -fsSL https://raw.githubusercontent.com/DenKedr/Secure-Messenger-Builder/main/install_ubuntu22_fixed.sh | sudo bash
+```
+
+```bash
+# Исправление существующей установки (проблемы с IPv6/SSL)
+curl -fsSL https://raw.githubusercontent.com/DenKedr/Secure-Messenger-Builder/main/fix_ipv6_ssl.sh | sudo bash
 ```
 
 **Преимущества Ubuntu 22.04:**
