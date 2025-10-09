@@ -118,6 +118,8 @@ export const translations = {
     'admin_panel': 'Admin Panel',
     'administrator': 'Administrator',
     'logout': 'Logout',
+    'security': 'Security',
+    'dashboard': 'Dashboard',
     
     // Stats
     'users': 'Users',
