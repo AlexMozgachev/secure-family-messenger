@@ -160,6 +160,11 @@ export const translations = {
     'connected_devices': 'Подключенные устройства',
     'user_devices': 'Устройства пользователя',
     'close': 'Закрыть',
+    'install_ssl_certificate': 'Установить SSL сертификат',
+    'confirm_ssl_install': 'Установить SSL сертификат? Это может занять несколько минут.',
+    'ssl_installing': 'Установка SSL сертификата...',
+    'ssl_installed_successfully': 'SSL сертификат установлен успешно',
+    'ssl_install_error': 'Ошибка установки SSL сертификата',
     
     // Login Page
     'login_page_title': 'Панель администратора',
