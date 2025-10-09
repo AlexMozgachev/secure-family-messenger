@@ -227,6 +227,16 @@ secure-messenger/
 - `DELETE /api/admin/users/{user_id}` - Удалить
 - `PUT /api/admin/users/{user_id}/password` - Сбросить пароль
 - `GET /api/admin/stats` - Статистика
+- `GET /api/admin/system/monitoring` - Мониторинг системы
+- `GET /api/admin/security/blocked-ips` - Заблокированные IP
+- `POST /api/admin/security/block-ips` - Заблокировать IP
+- `DELETE /api/admin/security/blocked-ips/{id}` - Разблокировать IP
+- `GET /api/admin/devices` - Активные устройства
+- `GET /api/admin/settings` - Настройки сервера
+- `PUT /api/admin/settings` - Обновить настройки
+- `POST /api/admin/backup` - Создать бэкап
+- `POST /api/admin/restore` - Восстановить из бэкапа
+- `POST /api/admin/ssl/renew` - Обновить SSL
 
 ### Файлы
 - `POST /api/upload` - Загрузить файл
