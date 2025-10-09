@@ -16,7 +16,11 @@ const Installer = ({ onComplete }) => {
     admin_username: '',
     admin_password: '',
     admin_display_name: '',
-    server_name: 'Secure Messenger'
+    server_name: 'Secure Messenger',
+    connection_type: 'ip',
+    domain: '',
+    ip_address: '',
+    auto_ssl: false
   });
   const [installing, setInstalling] = useState(false);
   const [installComplete, setInstallComplete] = useState(false);
