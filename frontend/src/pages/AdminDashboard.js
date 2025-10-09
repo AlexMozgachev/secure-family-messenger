@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Badge } from '../components/ui/badge';
-import { Users, MessageSquare, Shield, UserPlus, Ban, Trash2, Key, LogOut, RefreshCw, CheckCircle, XCircle, Activity, ShieldCheck, Languages, LayoutDashboard, Settings as SettingsIcon } from 'lucide-react';
+import { Users, MessageSquare, Shield, UserPlus, Ban, Trash2, Key, LogOut, RefreshCw, CheckCircle, XCircle, Activity, ShieldCheck, Languages, LayoutDashboard, Settings as SettingsIcon, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
 import { translations } from '../i18n/translations';
 import Settings from './Settings';
