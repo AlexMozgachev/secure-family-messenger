@@ -89,8 +89,8 @@ print_status "Проверка конфигурационных файлов..."
 
 # Backend .env
 if [ ! -f .env ]; then
-    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s ipinfo.io/ip 2>/dev/null || hostname -I | awk '{print $1}')
-    [ -z "$SERVER_IP" ] && SERVER_IP="localhost"
+    # Используем localhost для избежания проблем с IPv6
+    SERVER_IP="127.0.0.1"
     
     cat > .env << EOF
 MONGO_URL=mongodb://localhost:27017
@@ -99,7 +99,7 @@ CORS_ORIGINS=*
 JWT_SECRET=$(openssl rand -base64 32)
 FRONTEND_URL=http://$SERVER_IP:3000
 EOF
-    print_success "Backend .env создан"
+    print_success "Backend .env создан (localhost)"
 fi
 
 # Frontend .env
