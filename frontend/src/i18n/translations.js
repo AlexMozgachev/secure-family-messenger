@@ -158,6 +158,11 @@ export const translations = {
     'logout': 'Logout',
     'security': 'Security',
     'dashboard': 'Dashboard',
+    'settings': 'Settings',
+    'server_settings': 'Server',
+    'ssl_management': 'SSL Certificates',
+    'backup_restore': 'Backup & Restore',
+    'chats_metadata': 'Chats',
     
     // Stats
     'users': 'Users',
