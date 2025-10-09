@@ -121,17 +121,6 @@ const Security = ({ language, t }) => {
           <h2 className="text-2xl font-bold text-white">{t('security')}</h2>
           <p className="text-slate-400">Управление безопасностью системы</p>
         </div>
-        <Button
-          onClick={() => {
-            // Switch to devices tab by finding the TabsTrigger with value="devices"
-            const devicesTab = document.querySelector('button[data-state][role="tab"]:nth-child(2)');
-            if (devicesTab) devicesTab.click();
-          }}
-          className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white"
-        >
-          <Monitor className="w-4 h-4 mr-2" />
-          {t('connected_devices')}
-        </Button>
       </div>
 
       <Tabs defaultValue="blocked-ips" className="w-full">
