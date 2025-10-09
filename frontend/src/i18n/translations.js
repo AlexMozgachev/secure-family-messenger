@@ -336,6 +336,11 @@ export const translations = {
     'connected_devices': 'Connected Devices',
     'user_devices': 'User Devices',
     'close': 'Close',
+    'install_ssl_certificate': 'Install SSL Certificate',
+    'confirm_ssl_install': 'Install SSL certificate? This may take several minutes.',
+    'ssl_installing': 'Installing SSL certificate...',
+    'ssl_installed_successfully': 'SSL certificate installed successfully',
+    'ssl_install_error': 'SSL certificate installation error',
     
     // Login Page
     'login_page_title': 'Admin Panel',
