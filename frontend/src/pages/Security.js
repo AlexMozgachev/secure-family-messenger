@@ -123,8 +123,8 @@ const Security = ({ language, t }) => {
         </div>
         <Button
           onClick={() => {
-            // Switch to devices tab
-            const devicesTab = document.querySelector('[value="devices"]');
+            // Switch to devices tab by finding the TabsTrigger with value="devices"
+            const devicesTab = document.querySelector('button[data-state][role="tab"]:nth-child(2)');
             if (devicesTab) devicesTab.click();
           }}
           className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white"
