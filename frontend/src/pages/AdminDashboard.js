@@ -627,6 +627,94 @@ const AdminDashboard = ({ onLogout }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* User Devices Dialog */}
+      <Dialog open={showUserDevices} onOpenChange={setShowUserDevices}>
+        <DialogContent className="glass border-slate-700 max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="text-white">{t('user_devices')}</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Устройства пользователя: {selectedUser?.username}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {devicesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-white">Загрузка устройств...</div>
+              </div>
+            ) : userDevices.length === 0 ? (
+              <div className="text-center text-slate-400 py-8">
+                Нет активных устройств
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-slate-700">
+                      <TableHead className="text-slate-300">ID сессии</TableHead>
+                      <TableHead className="text-slate-300">{t('device_name')}</TableHead>
+                      <TableHead className="text-slate-300">{t('ip_address')}</TableHead>
+                      <TableHead className="text-slate-300">{t('last_active')}</TableHead>
+                      <TableHead className="text-slate-300">{t('gps_location')}</TableHead>
+                      <TableHead className="text-slate-300 text-right">{t('actions')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {userDevices.map((device) => (
+                      <TableRow key={device.id} className="border-slate-700">
+                        <TableCell className="text-white font-mono text-xs">
+                          {device.id?.slice(0, 12)}...
+                        </TableCell>
+                        <TableCell className="text-slate-300">
+                          {device.device_name || 'Неизвестное устройство'}
+                        </TableCell>
+                        <TableCell className="font-mono text-slate-300">
+                          {device.ip_address}
+                        </TableCell>
+                        <TableCell className="text-slate-400 text-sm">
+                          {formatDate(device.last_active)}
+                        </TableCell>
+                        <TableCell>
+                          {device.gps_latitude && device.gps_longitude ? (
+                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/50 text-xs">
+                              GPS: {device.gps_latitude.toFixed(4)}, {device.gps_longitude.toFixed(4)}
+                            </Badge>
+                          ) : (
+                            <span className="text-slate-500 text-sm">{t('no_location')}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-red-600 text-red-400 hover:bg-red-900/20"
+                            onClick={() => handleDisconnectUserDevice(device.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowUserDevices(false);
+                setSelectedUser(null);
+                setUserDevices([]);
+              }}
+              className="border-slate-600 text-slate-300 hover:bg-slate-800"
+            >
+              {t('close')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
