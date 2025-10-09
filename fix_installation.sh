@@ -114,12 +114,113 @@ EOF
     print_success "Frontend .env создан"
 fi
 
-# Переустановка frontend зависимостей если нужно
-if [ ! -d node_modules ]; then
-    print_status "Установка frontend зависимостей..."
-    yarn install
-    print_success "Frontend зависимости установлены"
-fi
+# Исправление frontend зависимостей
+print_status "Исправление frontend зависимостей..."
+
+# Создание совместимого package.json для Ubuntu 20.04 + Node.js 18
+cat > package_ubuntu20.json << 'EOF'
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@hookform/resolvers": "^3.3.2",
+    "@radix-ui/react-accordion": "^1.1.2",
+    "@radix-ui/react-alert-dialog": "^1.0.5",
+    "@radix-ui/react-aspect-ratio": "^1.0.3",
+    "@radix-ui/react-avatar": "^1.0.4",
+    "@radix-ui/react-checkbox": "^1.0.4",
+    "@radix-ui/react-collapsible": "^1.0.3",
+    "@radix-ui/react-context-menu": "^2.1.5",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-dropdown-menu": "^2.0.6",
+    "@radix-ui/react-hover-card": "^1.0.7",
+    "@radix-ui/react-label": "^2.0.2",
+    "@radix-ui/react-menubar": "^1.0.4",
+    "@radix-ui/react-navigation-menu": "^1.1.4",
+    "@radix-ui/react-popover": "^1.0.7",
+    "@radix-ui/react-progress": "^1.0.3",
+    "@radix-ui/react-radio-group": "^1.1.3",
+    "@radix-ui/react-scroll-area": "^1.0.5",
+    "@radix-ui/react-select": "^2.0.0",
+    "@radix-ui/react-separator": "^1.0.3",
+    "@radix-ui/react-slider": "^1.1.2",
+    "@radix-ui/react-slot": "^1.0.2",
+    "@radix-ui/react-switch": "^1.0.3",
+    "@radix-ui/react-tabs": "^1.0.4",
+    "@radix-ui/react-toast": "^1.1.5",
+    "@radix-ui/react-toggle": "^1.0.3",
+    "@radix-ui/react-toggle-group": "^1.0.4",
+    "@radix-ui/react-tooltip": "^1.0.7",
+    "axios": "^1.6.2",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "cmdk": "^0.2.0",
+    "cra-template": "1.2.0",
+    "date-fns": "^2.30.0",
+    "embla-carousel-react": "^8.0.0",
+    "input-otp": "^1.2.4",
+    "lucide-react": "^0.294.0",
+    "next-themes": "^0.2.1",
+    "react": "^18.2.0",
+    "react-day-picker": "8.9.1",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.48.2",
+    "react-resizable-panels": "^0.0.55",
+    "react-router-dom": "^6.20.1",
+    "react-scripts": "5.0.1",
+    "sonner": "^1.2.4",
+    "tailwind-merge": "^2.1.0",
+    "tailwindcss-animate": "^1.0.7",
+    "vaul": "^0.9.0",
+    "zod": "^3.22.4"
+  },
+  "scripts": {
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@craco/craco": "^7.1.0",
+    "@eslint/js": "8.55.0",
+    "autoprefixer": "^10.4.16",
+    "eslint": "8.55.0",
+    "eslint-plugin-import": "2.29.0",
+    "eslint-plugin-jsx-a11y": "6.8.0",
+    "eslint-plugin-react": "7.33.2",
+    "globals": "13.23.0",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6"
+  }
+}
+EOF
+
+# Резервная копия оригинального package.json
+cp package.json package.json.backup
+
+# Замена на совместимую версию
+cp package_ubuntu20.json package.json
+
+# Удаление старых зависимостей
+rm -rf node_modules yarn.lock
+
+# Установка совместимых зависимостей
+yarn install
+
+print_success "Frontend зависимости исправлены (совместимые с Node.js 18)"
 
 # Запуск сервисов
 print_status "Запуск сервисов..."
