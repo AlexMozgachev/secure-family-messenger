@@ -289,7 +289,8 @@ setup_frontend() {
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.0",
     "zod": "^3.22.4",
-    "web-vitals": "^3.5.2"
+    "web-vitals": "^3.5.2",
+    "react-scripts": "5.0.1"
   },
   "scripts": {
     "start": "craco start",
