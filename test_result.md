@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Complete Settings page integration by replacing Security navigation with Settings navigation in AdminDashboard.js and consolidating all server settings and security features into the unified Settings page"
+user_problem_statement: "Complete Settings page integration by replacing Security navigation with Settings navigation in AdminDashboard.js and consolidating all server settings and security features into the unified Settings page. Fix the install_ubuntu22_simple.sh script to use repository files instead of hardcoded outdated versions."
 
 backend:
   - task: "Admin settings API endpoints"
