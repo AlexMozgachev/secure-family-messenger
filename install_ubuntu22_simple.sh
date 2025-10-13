@@ -238,101 +238,28 @@ setup_frontend() {
     
     cd /opt/Secure-Messenger-Builder/frontend
     
-    # Создаем чистый package.json без warnings
-    cp package.json package.json.backup 2>/dev/null || true
+    # Проверяем наличие package.json из репозитория
+    if [ ! -f "package.json" ]; then
+        print_error "package.json не найден в репозитории!"
+        exit 1
+    fi
     
-    cat > package.json << 'EOF'
-{
-  "name": "frontend",
-  "version": "0.1.0",
-  "private": true,
-  "dependencies": {
-    "@hookform/resolvers": "^3.3.4",
-    "@radix-ui/react-accordion": "^1.1.2",
-    "@radix-ui/react-alert-dialog": "^1.0.5",
-    "@radix-ui/react-aspect-ratio": "^1.0.3",
-    "@radix-ui/react-avatar": "^1.0.4",
-    "@radix-ui/react-checkbox": "^1.0.4",
-    "@radix-ui/react-collapsible": "^1.0.3",
-    "@radix-ui/react-context-menu": "^2.1.5",
-    "@radix-ui/react-dialog": "^1.0.5",
-    "@radix-ui/react-dropdown-menu": "^2.0.6",
-    "@radix-ui/react-hover-card": "^1.0.7",
-    "@radix-ui/react-label": "^2.0.2",
-    "@radix-ui/react-menubar": "^1.0.4",
-    "@radix-ui/react-navigation-menu": "^1.1.4",
-    "@radix-ui/react-popover": "^1.0.7",
-    "@radix-ui/react-progress": "^1.0.3",
-    "@radix-ui/react-radio-group": "^1.1.3",
-    "@radix-ui/react-scroll-area": "^1.0.5",
-    "@radix-ui/react-select": "^2.0.0",
-    "@radix-ui/react-separator": "^1.0.3",
-    "@radix-ui/react-slider": "^1.1.2",
-    "@radix-ui/react-slot": "^1.0.2",
-    "@radix-ui/react-switch": "^1.0.3",
-    "@radix-ui/react-tabs": "^1.0.4",
-    "@radix-ui/react-toast": "^1.1.5",
-    "@radix-ui/react-toggle": "^1.0.3",
-    "@radix-ui/react-toggle-group": "^1.0.4",
-    "@radix-ui/react-tooltip": "^1.0.7",
-    "axios": "^1.6.5",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.0",
-    "cmdk": "^0.2.1",
-    "date-fns": "^3.2.0",
-    "embla-carousel-react": "^8.0.0",
-    "input-otp": "^1.2.4",
-    "lucide-react": "^0.316.0",
-    "next-themes": "^0.2.1",
-    "react": "^18.2.0",
-    "react-day-picker": "8.10.0",
-    "react-dom": "^18.2.0",
-    "react-hook-form": "^7.49.3",
-    "react-resizable-panels": "^1.0.9",
-    "react-router-dom": "^6.20.1",
-    "sonner": "^1.4.0",
-    "tailwind-merge": "^2.2.1",
-    "tailwindcss-animate": "^1.0.7",
-    "vaul": "^0.9.0",
-    "zod": "^3.22.4",
-    "web-vitals": "^3.5.2",
-    "react-scripts": "5.0.1"
-  },
-  "scripts": {
-    "start": "craco start",
-    "build": "craco build",
-    "test": "craco test --watchAll=false"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  },
-  "devDependencies": {
-    "@craco/craco": "^7.1.0",
-    "autoprefixer": "^10.4.17",
-    "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1"
-  }
-}
-EOF
-    print_status "Создан оптимизированный package.json без warnings"
+    print_status "Используем package.json из репозитория"
     
-    # Конфигурация
-    cat > .env << EOF
+    # Создание .env только если его нет
+    if [ ! -f ".env" ]; then
+        cat > .env << EOF
 REACT_APP_BACKEND_URL=http://$SERVER_IP:8001
 EOF
+        print_success ".env создан"
+    else
+        print_status ".env уже существует, пропускаем"
+    fi
     
     # Установка зависимостей
+    print_status "Установка зависимостей Node.js (это может занять несколько минут)..."
     rm -rf node_modules yarn.lock 2>/dev/null || true
-    yarn install
+    yarn install --network-timeout 100000
     
     print_success "Frontend готов"
 }
