@@ -203,16 +203,18 @@ setup_backend() {
     source venv/bin/activate
     pip install --upgrade pip
     
-    # Установка зависимостей
-    if [ -f "requirements_ubuntu22.txt" ]; then
-        pip install -r requirements_ubuntu22.txt
+    # Установка зависимостей из requirements.txt репозитория
+    if [ -f "requirements.txt" ]; then
+        print_status "Установка зависимостей из requirements.txt..."
+        pip install -r requirements.txt
     else
-        # Fallback - устанавливаем базовые пакеты
-        pip install fastapi==0.109.1 uvicorn[standard]==0.24.0 motor==3.3.2 pymongo==4.6.1 python-dotenv==1.0.0 python-multipart==0.0.6 passlib[bcrypt]==1.7.4 bcrypt==4.1.2 pydantic==2.5.3 psutil==5.9.6 requests==2.31.0 PyJWT==2.8.0
+        print_error "requirements.txt не найден!"
+        exit 1
     fi
     
-    # Конфигурация (БЕЗ SSL)
-    cat > .env << EOF
+    # Создание .env только если его нет
+    if [ ! -f ".env" ]; then
+        cat > .env << EOF
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=secure_messenger
 CORS_ORIGINS=*
@@ -221,6 +223,10 @@ FRONTEND_URL=http://$SERVER_IP:3000
 SSL_ENABLED=false
 SERVER_IP=$SERVER_IP
 EOF
+        print_success ".env создан"
+    else
+        print_status ".env уже существует, пропускаем"
+    fi
     
     deactivate
     print_success "Backend готов"
