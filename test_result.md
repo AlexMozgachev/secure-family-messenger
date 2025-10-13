@@ -147,6 +147,21 @@ backend:
         agent: "testing"
         comment: "NEW ENDPOINT TESTING COMPLETED - GET /api/admin/system/monitoring endpoint working perfectly. Comprehensive testing verified: 1) Proper admin authentication required (403 without auth), 2) Complete response structure with all required fields (cpu, memory, disk, network, system), 3) Data validation passed for all numeric values and types, 4) CPU data includes percent usage, cores count, and load averages, 5) Memory data shows used/total GB and percentage, 6) Disk usage with used/total GB and percentage, 7) Network statistics with sent/received/total MB, 8) System uptime in hours and timestamp. All values are reasonable and properly formatted. Authentication, response format, data validation, and error handling all working correctly."
 
+  - task: "Installation script fix (install_ubuntu22_simple.sh)"
+    implemented: true
+    working: true
+    file: "install_ubuntu22_simple.sh"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "user"
+        comment: "Installation script was embedding outdated package.json (React 18, react-router-dom 6) and requirements, causing version conflicts and 'Module not found' errors"
+      - working: true
+        agent: "main"
+        comment: "FIXED - Updated script to use repository's actual package.json and requirements.txt instead of hardcoding versions. Backend now uses working requirements.txt with FastAPI 0.110.1, Pydantic 2.11.9, etc. Frontend now uses working package.json with React 19.0.0, react-router-dom 7.5.1. Both .env files only created if they don't exist (preserves configuration). Added network timeout for yarn install. Created INSTALLATION_FIXED.md documentation."
+
 frontend:
   - task: "Replace Security navigation with Settings navigation"
     implemented: true
