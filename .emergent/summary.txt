@@ -1,56 +1,61 @@
 <analysis>
-The AI engineer successfully initiated the Secure Messenger Builder project, pivoting from complex Matrix Synapse/Flutter requirements to a custom E2EE solution on the supported FastAPI/React/MongoDB/Expo stack. The development progressed iteratively, starting with core backend and frontend components, including an automatic web installer and an admin panel. Subsequent phases focused on enhancing the admin panel with localization, user role management, and robust security features like IP blocking and device monitoring. The latest iteration involves consolidating server settings and security functionalities into a dedicated Settings page, addressing user feedback for improved configurability and a more organized admin interface. The process included extensive use of file writing, dependency management, and iterative testing with screenshots and API calls to validate functionality, with minor debugging for frontend rendering issues.
+The AI engineer's work trajectory outlines an iterative development process for the Secure Messenger Builder application. Initially, the focus was on consolidating UI elements in the admin panel, specifically merging security features into a new  page and updating navigation in . This was followed by implementing system monitoring, and a user-specific device list. A significant portion of the work then shifted to resolving complex installation and compatibility issues across Ubuntu 20.04 and 22.04 LTS, requiring the creation of multiple installation and fix scripts, and adjusting frontend/backend package versions. Concurrently, the project evolved to remove the web installer, directly presenting the admin login, and moving SSL certificate installation to the admin panel. The previous engineer was deeply involved in troubleshooting persistent installation failures and frontend build issues.
 </analysis>
 
 <product_requirements>
-The goal is to build a Secure Messenger Builder with a server (Synapse, VoIP, Nginx, DB, admin web installer), mobile clients (iOS/Android, E2EE, chats, calls, files, QR onboarding), and a web admin panel. Key features include E2EE (custom implementation, not Matrix Olm/Megolm), automated server setup (PostgreSQL, Redis, Synapse, coturn, Nginx, Certbot, admin backend/frontend, SSL config for IP/domain), admin login/password management, user CRUD (create/block/delete/reset password), last 10 login IPs per user, optional GPS tracking, media policy management, QR profile generation, and service health statuses. Recent additions include RU/EN localization, user role management (User ↔ Admin), IP-based bans after failed logins, a security section for blocked IPs (add/remove/pool), connected devices count, and last 10 login IPs for devices with GPS tracking. The user also requested installer choices for IP/domain, server settings backup/restore, changing IP/domain, re-issuing SSL certificates with auto-renew, and clarification on Chats and Messages in the admin panel to reflect aggregate data, not message content.
+The overarching goal is to develop a Secure Messenger Builder with a custom E2EE backend (FastAPI/MongoDB) and a React-based admin web panel. Core features include automated server setup, admin login/password management, comprehensive user CRUD (create/block/delete/reset password), security features (IP blocking, login attempt tracking, device monitoring with optional GPS), media policy, and QR profile generation. Recent feature requests and implementations include RU/EN localization, user role management, consolidated server settings (backup/restore, domain/IP management, SSL certificates) into a  page, and aggregate data display for Chats and Messages. The user also explicitly requested a system monitoring section (CPU, RAM, traffic) and a user-specific device list accessible via a modal from the user management section. A major recent change was the removal of the web installer, making the application directly present the admin login, with SSL installation moved to the admin panel.
 </product_requirements>
 
 <key_technical_concepts>
 - **FastAPI**: Backend API development.
 - **React**: Frontend UI development.
-- **MongoDB**: Database for backend data storage.
+- **MongoDB**: Database for backend data storage, using .
 - **E2EE (Custom)**: End-to-End Encryption implementation.
-- **WebSockets**: Real-time communication for messaging.
-- **JWT**: JSON Web Tokens for authentication.
-- **Shadcn UI & Tailwind CSS**: Frontend styling and component library.
-- ****: For toast notifications.
-- ****: For internationalization (RU/EN).
-- ****: Asynchronous MongoDB driver.
+- **WebSockets**: Real-time communication.
+- **JWT**: Authentication.
+- **Shadcn UI & Tailwind CSS**: Frontend styling.
+- ****: Internationalization (RU/EN).
+- ****: Python library for system monitoring.
+- ****: For service management on Linux.
 </key_technical_concepts>
 
 <code_architecture>
 
 
--   : The core FastAPI application. This file handles all backend logic, including user authentication (login, logout), user management (create, block, delete, password reset, role change via Synapse Admin API proxy), security features (IP blocking, login attempt tracking), device monitoring (auth logs, GPS data), server settings (backup/restore, domain/IP config), and WebSocket communication for E2EE messages. It uses Pydantic models for data validation and  for MongoDB interaction.
--   : The main React component, serving as the application's entry point and routing manager. It integrates the  component for notifications and sets up routes for the installer, admin login, and admin dashboard.
--   : This component provides a web-based, multi-step installation wizard. It allows users to configure the server, including the choice between installing with an IP address or a domain name, and is designed to automate the setup process.
--   : The central component for the admin panel. It displays user lists, allows for user management (block, delete, reset password, change role), and provides navigation to other admin sections like Security. It is currently being updated to integrate a Settings page.
--   : This page was created to manage IP blocks (add/remove/pool) and view device-related security logs. It is now slated to be integrated into the  page.
--   : This new component is currently being created to serve as a comprehensive server settings hub. It will include functionalities like server configuration backup/restore, domain/IP management, SSL certificate options, and will house the features previously in .
--   : Contains translation strings for both Russian (RU) and English (EN), enabling localization for the frontend.
--   : Documentation detailing the custom End-to-End Encryption implementation, crucial for developers understanding the cryptographic approach.
+-   : The core FastAPI backend. It handles authentication, user management, security (IP blocking, login attempts), device monitoring, server settings, and WebSocket communication.
+    -   **Changes**: Added  imports, new  endpoint for system stats, and  endpoint for SSL certificate installation.
+-   : Main React component for routing.
+-   : Admin panel entry.
+    -   **Changes**: Replaced Security navigation with Settings. Integrated  component. Added state and functions for displaying a user-specific devices modal, including a Monitor button for each user.
+-   : Consolidated server settings.
+    -   **Changes**: Integrated content from . Added UI for Install SSL button, and associated  function.
+-   : Old security page, now integrated into .
+    -   **Changes**: Readability fix for Постоянно text in the Blocked IPs table. Removed the List of Devices button.
+-   : New component for displaying CPU, RAM, disk, network usage, and uptime.
+    -   **Changes**: Removed the List of Devices button.
+-   : Contains translation strings.
+    -   **Changes**: Added translations for system monitoring, device list, and SSL installation.
+-   : New simplified installation script for Ubuntu 22.04, replacing older, problematic ones. It removes SSL installation from the initial setup and focuses on IPv4 configuration.
+-   : A script for fixing IPv6/SSL issues in existing installations.
+-    &  / : These files were created/updated to define compatible backend (Python) and frontend (Node.js) dependencies specifically for Ubuntu 22.04 LTS environments, resolving numerous installation conflicts.
 </code_architecture>
 
 <pending_tasks>
--   Complete UI implementation for the new  page.
--   Integrate the content and functionality of the  page directly into .
--   Implement UI elements for displaying connected devices, their IP addresses, and device names.
--   Develop UI for Find Phone by GPS feature, leveraging the backend API.
--   Implement UI for SSL certificate management (re-issue, auto-renew) in the  page.
--   Refine Chats and Messages sections in the admin panel to show aggregate data (e.g., chat count, participants, admin roles) rather than message content.
+- Complete full review and debugging of the  script for full compatibility and error-free installation on a clean Ubuntu 22.04 LTS.
+- Test the new SSL installation functionality within the admin panel (frontend and backend integration).
+- Ensure that the web installer is completely removed/bypassed and that the application always directs to the admin login on fresh installations.
 </pending_tasks>
 
 <current_work>
-The AI engineer is currently in the process of creating and integrating a new  page into the frontend admin panel. This page is intended to be a centralized location for server-wide configurations and will also absorb the existing security functionalities from the  page.
+The AI engineer is currently in a deep troubleshooting phase focused on the  script. The goal is to ensure a smooth and error-free installation of the application on a clean Ubuntu 22.04 LTS environment. This involves:
+1.  **Removing Ubuntu 20.04 related artifacts:** All old installation scripts, , and  files tailored for Ubuntu 20.04 have been deprecated or removed.
+2.  **Simplifying installation:** The  script was created, removing SSL certificate installation from the initial setup (to be handled via the admin panel later) and configuring primarily for IPv4 to avoid previous IPv6 issues.
+3.  **Frontend/Backend compatibility:** The engineer created  and  to specify compatible Python and Node.js dependencies for Ubuntu 22.04, addressing previous conflicts (e.g.,  and  versions).  was re-added after being mistakenly removed, which caused a  error.
+4.  **SSL management in admin panel:** New UI () and API () endpoints have been added for installing SSL certificates directly from the admin interface.
 
-Specifically, the following actions have just been completed:
-1.  Updating the  file () to include new translation strings for the Settings page in both Russian and English.
-2.  Creating the initial file for the  component ().
-
-The next immediate step is to modify  to replace the old Security navigation with the new Settings navigation and to ensure proper routing and rendering of the  page, which will then house the combined settings and security features.
+The immediate problem is that the  script is still not leading to a fully functional installation, and the user is reporting errors, including  in the frontend. The engineer is analyzing the script and its compatibility.
 </current_work>
 
 <optional_next_step>
-Update  to replace the Security navigation with Settings and correctly route to the new  page.
+Conduct a full, detailed analysis of  to identify and fix remaining critical errors and ensure full compatibility with Ubuntu 22.04 LTS.
 </optional_next_step>
