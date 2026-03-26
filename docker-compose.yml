@@ -1,0 +1,45 @@
+services:
+  mongodb:
+    image: mongo:6
+    container_name: messenger-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - messenger-net
+
+  backend:
+    build: ./backend
+    container_name: messenger-backend
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/messenger
+      - SECRET_KEY=your-secret-key-here   # Замените на случайную строку
+    ports:
+      - "8001:8001"
+    networks:
+      - messenger-net
+    volumes:
+      - backend_uploads:/app/uploads
+
+  frontend:
+    build: ./frontend
+    container_name: messenger-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8001
+    networks:
+      - messenger-net
+
+volumes:
+  mongo_data:
+  backend_uploads:
+
+networks:
+  messenger-net:
