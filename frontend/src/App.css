@@ -114,3 +114,32 @@ code {
   transform: translateY(-4px);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
+/* Мобильная оптимизация */
+@media (max-width: 768px) {
+  body {
+    font-size: 16px;
+  }
+  button, input, textarea {
+    font-size: 16px !important;
+  }
+  .container, .chat-container {
+    padding: 12px;
+  }
+}
+
+/* iOS стили */
+body {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* Плавные переходы */
+* {
+  transition: all 0.2s ease;
+}
+:root {
+  --tg-blue: #007AFF;
+  --tg-bg: #f5f5f5;
+  --tg-bubble-in: #e5e5ea;
+  --tg-bubble-out: #007AFF;
+}

@@ -8,6 +8,8 @@ export default function UserChat() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const [ws, setWs] = useState(null);
   const messagesEndRef = useRef(null);
   const navigate = useNavigate();
@@ -26,169 +28,153 @@ export default function UserChat() {
     if (selectedRoom && token) {
       fetchMessages(selectedRoom.id);
       
-      // WebSocket подключение для real-time
       const socket = new WebSocket(`wss://${window.location.host}/ws/rooms/${selectedRoom.id}?token=${token}`);
       socket.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        setMessages(prev => [...prev, message]);
+        try {
+          const message = JSON.parse(event.data);
+          setMessages(prev => [...prev, message]);
+        } catch (e) {
+          console.error('WebSocket error:', e);
+        }
       };
       setWs(socket);
-      
       return () => socket.close();
     }
   }, [selectedRoom, token]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, [messages]);
 
   const fetchRooms = async () => {
     try {
-      const response = await axios.get('/api/rooms', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get('/api/rooms', { headers: { Authorization: `Bearer ${token}` } });
       setRooms(response.data);
-      if (response.data.length > 0 && !selectedRoom) {
-        setSelectedRoom(response.data[0]);
-      }
+      if (response.data.length > 0 && !selectedRoom) setSelectedRoom(response.data[0]);
       setLoading(false);
     } catch (error) {
-      console.error('Ошибка загрузки комнат:', error);
+      console.error('Error:', error);
       setLoading(false);
     }
   };
 
   const fetchMessages = async (roomId) => {
     try {
-      const response = await axios.get(`/api/rooms/${roomId}/messages`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`/api/rooms/${roomId}/messages`, { headers: { Authorization: `Bearer ${token}` } });
       setMessages(response.data);
     } catch (error) {
-      console.error('Ошибка загрузки сообщений:', error);
+      console.error('Error:', error);
+    }
+  };
+
+  const uploadImage = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await axios.post('/api/upload', formData, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+      });
+      return response.data.file_url;
+    } catch (error) {
+      console.error('Upload error:', error);
+      return null;
     }
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedRoom) return;
+    if (!newMessage.trim() && !selectedFile) return;
+    setUploading(true);
+    let imageUrl = null;
+    if (selectedFile) {
+      imageUrl = await uploadImage(selectedFile);
+      setSelectedFile(null);
+    }
     try {
       await axios.post(`/api/rooms/${selectedRoom.id}/messages`, 
-        { content: newMessage },
+        { content: newMessage, image_url: imageUrl },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setNewMessage('');
-      // WebSocket уже обновит сообщения
     } catch (error) {
-      console.error('Ошибка отправки сообщения:', error);
+      console.error('Send error:', error);
+    } finally {
+      setUploading(false);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
+  const handleFileSelect = (e) => setSelectedFile(e.target.files[0]);
+  const logout = () => { localStorage.clear(); navigate('/login'); };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-xl">Загрузка...</div>
-      </div>
-    );
-  }
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Загрузка...</div>;
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Боковая панель с комнатами */}
-      <div className="w-80 bg-white border-r flex flex-col">
-        <div className="p-4 border-b">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold">Чаты</h2>
-            <button
-              onClick={logout}
-              className="text-red-500 hover:text-red-700 text-sm"
-            >
-              Выйти
-            </button>
-          </div>
-          <p className="text-sm text-gray-500 mt-1">{user.display_name || user.username}</p>
+    <div style={{ display: 'flex', height: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
+      {/* Список чатов — закреплённая шапка */}
+      <div style={{ width: 320, background: '#fff', borderRight: '0.5px solid #e0e0e0', display: 'flex', flexDirection: 'column', height: '100vh' }}>
+        <div style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 10, padding: '20px 16px', borderBottom: '0.5px solid #e0e0e0' }}>
+          <h2 style={{ fontSize: 24, fontWeight: 700 }}>Чаты</h2>
+          <button onClick={logout} style={{ marginTop: 8, color: '#007AFF', background: 'none', border: 'none', fontSize: 14 }}>Выйти</button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           {rooms.map(room => (
-            <div
-              key={room.id}
-              onClick={() => setSelectedRoom(room)}
-              className={`p-4 cursor-pointer hover:bg-gray-50 border-b transition ${
-                selectedRoom?.id === room.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-              }`}
-            >
-              <div className="font-medium">{room.name}</div>
-              <div className="text-sm text-gray-500">
-                {room.type === 'direct' ? 'Личный чат' : 'Групповой чат'}
-              </div>
+            <div key={room.id} onClick={() => setSelectedRoom(room)} style={{ padding: '12px 16px', cursor: 'pointer', background: selectedRoom?.id === room.id ? '#e5e5ea' : '#fff', borderBottom: '0.5px solid #e0e0e0' }}>
+              <div style={{ fontWeight: 600 }}>{room.name}</div>
+              <div style={{ fontSize: 12, color: '#8e8e93' }}>{room.type === 'direct' ? 'Личный чат' : 'Групповой чат'}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Основная область чата */}
-      <div className="flex-1 flex flex-col">
+      {/* Область чата — закреплённая шапка */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', height: '100vh' }}>
         {selectedRoom ? (
           <>
-            <div className="bg-white border-b p-4">
-              <h2 className="text-xl font-bold">{selectedRoom.name}</h2>
+            <div style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fff', padding: '12px 16px', borderBottom: '0.5px solid #e0e0e0' }}>
+              <h2 style={{ fontSize: 17, fontWeight: 600 }}>{selectedRoom.name}</h2>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {messages.map(msg => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[70%] rounded-lg p-3 ${
-                      msg.sender_id === user.id
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white text-gray-800'
-                    }`}
-                  >
-                    <div className="text-xs opacity-75 mb-1">
-                      {msg.sender?.username || msg.sender_id}
-                    </div>
-                    <div>{msg.content}</div>
-                    <div className="text-xs opacity-50 mt-1 text-right">
-                      {new Date(msg.created_at).toLocaleTimeString()}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', }}>
+              {messages.map(msg => {
+                const isOutgoing = msg.sender_id === user.id;
+                return (
+                  <div key={msg.id} style={{ display: 'flex', justifyContent: isOutgoing ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
+                    <div style={{
+                      maxWidth: '70%',
+                      padding: '8px 12px',
+                      borderRadius: 18,
+                      background: isOutgoing ? '#007AFF' : '#e5e5ea',
+                      color: isOutgoing ? '#fff' : '#000',
+                      borderBottomRightRadius: isOutgoing ? 4 : 18,
+                      borderBottomLeftRadius: isOutgoing ? 18 : 4
+                    }}>
+                      <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>{msg.sender?.display_name || msg.sender?.username || msg.sender_id}</div>
+                      {msg.image_url && (
+                        <img src={msg.image_url} alt="image" style={{ maxWidth: '100%', borderRadius: 12, marginBottom: 8, cursor: 'pointer' }} onClick={() => window.open(msg.image_url)} />
+                      )}
+                      {msg.content && <div style={{ fontSize: 15 }}>{msg.content}</div>}
+                      <div style={{ fontSize: 10, opacity: 0.6, marginTop: 4, textAlign: 'right' }}>{new Date(msg.created_at).toLocaleTimeString()}</div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
-            <div className="bg-white border-t p-4">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Введите сообщение..."
-                  className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={sendMessage}
-                  className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition"
-                >
-                  Отправить
-                </button>
+            <div style={{ position: 'sticky', bottom: 0, background: '#fff', borderTop: '0.5px solid #e0e0e0', padding: '10px 16px' }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <input type="file" accept="image/*" onChange={handleFileSelect} style={{ display: 'none' }} id="file-input" />
+                <label htmlFor="file-input" style={{ background: '#f5f5f5', width: 40, height: 40, borderRadius: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 20 }}>📷</label>
+                <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyPress={e => e.key === 'Enter' && sendMessage()} placeholder="Сообщение" style={{ flex: 1, border: 'none', background: '#f5f5f5', padding: '10px 16px', borderRadius: 25, fontSize: 16 }} />
+                <button onClick={sendMessage} disabled={uploading} style={{ background: '#007AFF', border: 'none', width: 40, height: 40, borderRadius: 50, color: '#fff', fontSize: 20, cursor: 'pointer' }}>➤</button>
               </div>
+              {selectedFile && (
+                <div style={{ marginTop: 8, fontSize: 12 }}>
+                  📎 {selectedFile.name} <button onClick={() => setSelectedFile(null)} style={{ marginLeft: 8, color: 'red', background: 'none', border: 'none' }}>✕</button>
+                </div>
+              )}
             </div>
           </>
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            Выберите чат для начала общения
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#8e8e93' }}>
+            Выберите чат
           </div>
         )}
       </div>

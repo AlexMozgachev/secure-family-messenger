@@ -5,6 +5,12 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#000000" />
         <meta name="description" content="A product of emergent.sh" />
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Family Chat">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<meta name="theme-color" content="#007AFF">
         <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
@@ -24,6 +30,168 @@
         -->
         <script src="https://unpkg.com/rrweb@latest/dist/rrweb.min.js"></script>
         <script src="https://d2adkz2s9zrlge.cloudfront.net/rrweb-recorder-20250919-1.js"></script>
+<style>
+@media (max-width: 768px) {
+  body { font-size: 16px !important; }
+  button, input, textarea { font-size: 16px !important; }
+  .container, .chat-container { padding: 12px !important; }
+}
+body { -webkit-tap-highlight-color: transparent; }
+* { transition: all 0.2s ease; }
+</style>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #f5f5f5;
+    color: #000;
+  }
+
+  /* Telegram стили */
+  .tg-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: #fff;
+    min-height: 100vh;
+  }
+
+  .tg-header {
+    background: #fff;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid #e0e0e0;
+    font-weight: 600;
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .tg-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #007AFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+  }
+
+  .tg-message {
+    display: flex;
+    margin-bottom: 12px;
+  }
+
+  .tg-message.outgoing {
+    justify-content: flex-end;
+  }
+
+  .tg-bubble {
+    max-width: 75%;
+    padding: 8px 12px;
+    border-radius: 18px;
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .tg-message.outgoing .tg-bubble {
+    background: #007AFF;
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+
+  .tg-message.incoming .tg-bubble {
+    background: #e5e5ea;
+    color: #000;
+    border-bottom-left-radius: 4px;
+  }
+
+  .tg-time {
+    font-size: 10px;
+    opacity: 0.6;
+    margin-top: 4px;
+    text-align: right;
+  }
+
+  .tg-input {
+    background: #fff;
+    border-top: 0.5px solid #e0e0e0;
+    padding: 10px 16px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .tg-input input {
+    flex: 1;
+    border: none;
+    background: #f5f5f5;
+    padding: 10px 16px;
+    border-radius: 25px;
+    font-size: 16px;
+  }
+
+  .tg-input button {
+    background: #007AFF;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+  }
+
+  /* Адаптация под iOS */
+  @supports (padding: max(0px)) {
+    .tg-header {
+      padding-top: max(12px, env(safe-area-inset-top));
+    }
+    .tg-input {
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+    }
+  }
+</style>
+<style>
+  body {
+    background: #f5f5f5 !important;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Фон для чата */
+  .chat-background {
+    background: #f5f5f5;
+  }
+  
+  /* Альтернативный тёмный фон (раскомментируйте если хотите тёмную тему) */
+  /*
+  body, .chat-background {
+    background: #1a1a1a !important;
+  }
+  */
+</style>
+<style>
+  body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .message-bubble-out {
+    background: #007AFF !important;
+  }
+  
+  .message-bubble-in {
+    background: #e5e5ea !important;
+  }
+</style>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
@@ -38,30 +206,7 @@
       To begin the development, run `npm start` or `yarn start`.
       To create a production bundle, use `npm run build` or `yarn build`.
     -->
-        <a
-            id="emergent-badge"
-            target="_blank"
-            href="https://app.emergent.sh/?utm_source=emergent-badge"
-            style="
-                display: flex !important;
-                align-items: center !important;
-                position: fixed !important;
-                bottom: 20px;
-                right: 20px;
-                text-decoration: none;
-                padding: 6px 10px;
-                font-family: -apple-system, BlinkMacSystemFont,
-                    &quot;Segoe UI&quot;, Roboto, Oxygen, Ubuntu, Cantarell,
-                    &quot;Open Sans&quot;, &quot;Helvetica Neue&quot;,
-                    sans-serif !important;
-                font-size: 12px !important;
-                z-index: 9999 !important;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
-                border-radius: 8px !important;
-                background-color: #ffffff !important;
-                border: 1px solid rgba(255, 255, 255, 0.25) !important;
-            "
-        >
+       
             <div
                 style="display: flex; flex-direction: row; align-items: center"
             >
