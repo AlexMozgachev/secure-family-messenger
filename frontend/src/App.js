@@ -7,6 +7,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import { Toaster } from "sonner";
 import UserLogin from './pages/UserLogin';
 import UserChat from './pages/UserChat';
+import ChatRoom from './pages/ChatRoom';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -109,6 +110,7 @@ function App() {
               )
             } 
           />
+<Route path="/chat/room/:roomId/:roomName" element={<ChatRoom />} />
 
           <Route 
             path="/chat" 
