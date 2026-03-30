@@ -3,25 +3,23 @@ import jwt
 import bcrypt
 import logging
 import uuid
+import shutil
+import tempfile
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, Depends, status, Body, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Depends, status, Body, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 import motor.motor_asyncio
 from bson import ObjectId
-import shutil
-from fastapi import UploadFile, File
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Конфигурация
-SECRET_KEY = os.environ.get("SECRET_KEY")
-if not SECRET_KEY:
-    raise ValueError("SECRET_KEY environment variable is not set")
+SECRET_KEY = os.environ.get("SECRET_KEY", "supersecretkey12345")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -89,7 +87,6 @@ class MessageCreate(BaseModel):
 
 # Вспомогательные функции
 def convert_objectid(obj):
-    """Convert ObjectId to string for JSON serialization"""
     if isinstance(obj, dict):
         return {k: convert_objectid(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -319,7 +316,6 @@ async def create_message(room_id: str, data: MessageCreate, current_user: dict =
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     
-    # Получаем данные отправителя
     sender = await db.users.find_one({"id": current_user["id"]})
     
     message = {
@@ -333,7 +329,8 @@ async def create_message(room_id: str, data: MessageCreate, current_user: dict =
         "image_url": data.image_url,
         "created_at": datetime.utcnow().isoformat(),
         "edited_at": None,
-        "deleted": False
+        "deleted": False,
+        "read_by": []
     }
     
     await db.rooms.update_one(
@@ -344,14 +341,57 @@ async def create_message(room_id: str, data: MessageCreate, current_user: dict =
         }
     )
     
-    # Отправляем через WebSocket
-    await manager.send_message(message, room_id)
-    
-    return convert_objectid(message)    
-    # Отправляем сообщение через WebSocket
     await manager.send_message(message, room_id)
     
     return convert_objectid(message)
+
+@app.post("/api/rooms/{room_id}/messages/{message_id}/read")
+async def mark_message_read(
+    room_id: str,
+    message_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    room = await db.rooms.find_one({"id": room_id, "members": current_user["id"]})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    result = await db.rooms.update_one(
+        {"id": room_id, "messages.id": message_id},
+        {"$addToSet": {"messages.$.read_by": current_user["id"]}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    return {"status": "ok"}
+
+# ==================== ЗАГРУЗКА ФАЙЛОВ ====================
+@app.post("/api/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    upload_dir = os.path.join(tempfile.gettempdir(), "messenger_uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    original_filename = file.filename
+    ext = original_filename.split(".")[-1].lower() if "." in original_filename else "jpg"
+    
+    filename = f"{uuid.uuid4()}.{ext}"
+    filepath = os.path.join(upload_dir, filename)
+    
+    try:
+        with open(filepath, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving file: {str(e)}")
+    
+    file_url = f"/uploads/{filename}"
+    
+    print(f"File uploaded: {original_filename} -> {file_url}")
+    
+    return {"file_url": file_url, "filename": original_filename}
+
 # ==================== АДМИН-ПАНЕЛЬ ====================
 @app.get("/api/admin/users")
 async def admin_get_users(current_user: dict = Depends(get_current_user)):
@@ -446,46 +486,3 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
-# ==================== ЗАГРУЗКА ФАЙЛОВ ====================
-@app.post("/api/upload")
-async def upload_file(
-    file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
-):
-    import tempfile
-    import shutil
-    import uuid
-# Оптимизация изображения (опционально, требует Pillow)
-# from PIL import Image
-# img = Image.open(filepath)
-# img.save(filepath, optimize=True, quality=85)
-    
-    # Создаём папку для загрузок
-    upload_dir = os.path.join(tempfile.gettempdir(), "messenger_uploads")
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    # Получаем расширение файла
-    original_filename = file.filename
-    ext = original_filename.split(".")[-1].lower() if "." in original_filename else "jpg"
-    
-    # Разрешаем PNG, JPG, JPEG
-   # if ext not in ['png', 'jpg', 'jpeg']:
-   #     raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}. Only PNG, JPG, JPEG allowed")
-    
-    # Генерируем уникальное имя
-    filename = f"{uuid.uuid4()}.{ext}"
-    filepath = os.path.join(upload_dir, filename)
-    
-    # Сохраняем файл
-    try:
-        with open(filepath, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error saving file: {str(e)}")
-    
-    # Формируем URL
-    file_url = f"/uploads/{filename}"
-    
-    print(f"File uploaded: {original_filename} -> {file_url}")
-    
-    return {"file_url": file_url, "filename": original_filename}
