@@ -3,10 +3,9 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import axios from "axios";
 import Installer from "./pages/Installer";
+import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import { Toaster } from "sonner";
-import UserLogin from './pages/UserLogin';
-import UserChat from './pages/UserChat';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -68,28 +67,10 @@ function App() {
     setIsAuthenticated(false);
   };
 
-  const isUserAdmin = () => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      return user.is_admin === true;
-    } catch (e) {
-      return false;
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="text-white text-xl">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!isInstalled) {
-    return (
-      <div className="App">
-        <Toaster position="top-right" richColors />
-        <Installer onComplete={handleInstallComplete} />
       </div>
     );
   }
@@ -99,51 +80,42 @@ function App() {
       <Toaster position="top-right" richColors />
       <BrowserRouter>
         <Routes>
-          <Route 
-            path="/login" 
+          <Route
+            path="/"
             element={
-              isAuthenticated ? (
-                <Navigate to={isUserAdmin() ? "/admin" : "/chat"} replace />
-              ) : (
-                <UserLogin onLogin={handleLogin} />
-              )
-            } 
-          />
-
-          <Route 
-            path="/chat" 
-            element={
-              isAuthenticated ? (
-                <UserChat />
-              ) : (
+              !isInstalled ? (
+                <Installer onComplete={handleInstallComplete} />
+              ) : !isAuthenticated ? (
                 <Navigate to="/login" replace />
+              ) : (
+                <Navigate to="/admin" replace />
               )
-            } 
+            }
           />
-
-          <Route 
-            path="/admin/*" 
+          <Route
+            path="/login"
             element={
-              isAuthenticated && isUserAdmin() ? (
+              !isInstalled ? (
+                <Navigate to="/" replace />
+              ) : isAuthenticated ? (
+                <Navigate to="/admin" replace />
+              ) : (
+                <AdminLogin onLogin={handleLogin} />
+              )
+            }
+          />
+          <Route
+            path="/admin/*"
+            element={
+              !isInstalled ? (
+                <Navigate to="/" replace />
+              ) : !isAuthenticated ? (
+                <Navigate to="/login" replace />
+              ) : (
                 <AdminDashboard onLogout={handleLogout} />
-              ) : (
-                <Navigate to="/login" replace />
               )
-            } 
+            }
           />
-
-          <Route 
-            path="/" 
-            element={
-              isAuthenticated ? (
-                <Navigate to={isUserAdmin() ? "/admin" : "/chat"} replace />
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            } 
-          />
-
-          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </div>

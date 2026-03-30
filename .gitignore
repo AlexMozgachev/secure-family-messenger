@@ -18,3 +18,9 @@ venv/
 *.pem
 *.key
 *.crt
+
+.env
+*.log
+mongo_data/
+backend_uploads/
+.env
