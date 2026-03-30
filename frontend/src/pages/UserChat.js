@@ -11,10 +11,27 @@ export default function UserChat() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [ws, setWs] = useState(null);
+  const [notificationPermission, setNotificationPermission] = useState('default');
   const messagesEndRef = useRef(null);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+  // Проверяем разрешение на уведомления при загрузке
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  // Регистрация Service Worker
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker registered'))
+        .catch(err => console.error('SW registration failed:', err));
+    }
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -30,21 +47,54 @@ export default function UserChat() {
       
       const socket = new WebSocket(`wss://${window.location.host}/ws/rooms/${selectedRoom.id}?token=${token}`);
       socket.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          setMessages(prev => [...prev, message]);
-        } catch (e) {
-          console.error('WebSocket error:', e);
+        const message = JSON.parse(event.data);
+        setMessages(prev => [...prev, message]);
+        
+        // Показываем уведомление, если страница не активна и сообщение не от текущего пользователя
+        if (document.hidden && message.sender_id !== user.id && notificationPermission === 'granted') {
+          const title = 'Новое сообщение';
+          const body = `${message.sender?.display_name || message.sender_id}: ${message.content || '📷 Изображение'}`;
+          const notification = new Notification(title, { body, icon: '/icons/icon-192.png' });
+          notification.onclick = () => {
+            window.focus();
+            notification.close();
+          };
         }
       };
+      socket.onerror = (error) => console.error('WebSocket error:', error);
       setWs(socket);
       return () => socket.close();
     }
-  }, [selectedRoom, token]);
+  }, [selectedRoom, token, user.id, notificationPermission]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Отметка о прочтении
+  useEffect(() => {
+    if (!messages.length || !selectedRoom || !token) return;
+    
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const messageId = entry.target.getAttribute('data-message-id');
+          const senderId = entry.target.getAttribute('data-sender-id');
+          if (messageId && senderId !== user.id) {
+            fetch(`/api/rooms/${selectedRoom.id}/messages/${messageId}/read`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}` }
+            }).catch(e => console.error('Read receipt error:', e));
+          }
+        }
+      });
+    }, { threshold: 0.5 });
+    
+    const messageElements = document.querySelectorAll('.message-item');
+    messageElements.forEach(el => observer.observe(el));
+    
+    return () => observer.disconnect();
+  }, [messages, selectedRoom, token, user.id]);
 
   const fetchRooms = async () => {
     try {
@@ -53,7 +103,7 @@ export default function UserChat() {
       if (response.data.length > 0 && !selectedRoom) setSelectedRoom(response.data[0]);
       setLoading(false);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error loading rooms:', error);
       setLoading(false);
     }
   };
@@ -63,7 +113,22 @@ export default function UserChat() {
       const response = await axios.get(`/api/rooms/${roomId}/messages`, { headers: { Authorization: `Bearer ${token}` } });
       setMessages(response.data);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error loading messages:', error);
+    }
+  };
+
+  const requestNotificationPermission = () => {
+    if ('Notification' in window) {
+      Notification.requestPermission().then(perm => {
+        setNotificationPermission(perm);
+        if (perm === 'granted') {
+          alert('Уведомления включены!');
+        } else {
+          alert('Уведомления отклонены. Вы можете включить их в настройках браузера.');
+        }
+      });
+    } else {
+      alert('Ваш браузер не поддерживает уведомления');
     }
   };
 
@@ -109,11 +174,16 @@ export default function UserChat() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
-      {/* Список чатов — закреплённая шапка */}
+      {/* Список чатов */}
       <div style={{ width: 320, background: '#fff', borderRight: '0.5px solid #e0e0e0', display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <div style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 10, padding: '20px 16px', borderBottom: '0.5px solid #e0e0e0' }}>
           <h2 style={{ fontSize: 24, fontWeight: 700 }}>Чаты</h2>
-          <button onClick={logout} style={{ marginTop: 8, color: '#007AFF', background: 'none', border: 'none', fontSize: 14 }}>Выйти</button>
+          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+            <button onClick={logout} style={{ color: '#007AFF', background: 'none', border: 'none', fontSize: 14 }}>Выйти</button>
+            <button onClick={requestNotificationPermission} style={{ color: notificationPermission === 'granted' ? '#34C759' : '#007AFF', background: 'none', border: 'none', fontSize: 14 }}>
+              {notificationPermission === 'granted' ? '🔔 Уведомления включены' : '🔕 Включить уведомления'}
+            </button>
+          </div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {rooms.map(room => (
@@ -125,18 +195,18 @@ export default function UserChat() {
         </div>
       </div>
 
-      {/* Область чата — закреплённая шапка */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', height: '100vh' }}>
+      {/* Область чата */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', height: '100vh' }}>
         {selectedRoom ? (
           <>
             <div style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fff', padding: '12px 16px', borderBottom: '0.5px solid #e0e0e0' }}>
               <h2 style={{ fontSize: 17, fontWeight: 600 }}>{selectedRoom.name}</h2>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: 'transparent' }}>
               {messages.map(msg => {
                 const isOutgoing = msg.sender_id === user.id;
                 return (
-                  <div key={msg.id} style={{ display: 'flex', justifyContent: isOutgoing ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
+                  <div key={msg.id} data-message-id={msg.id} data-sender-id={msg.sender_id} className="message-item" style={{ display: 'flex', justifyContent: isOutgoing ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
                     <div style={{
                       maxWidth: '70%',
                       padding: '8px 12px',
@@ -151,7 +221,12 @@ export default function UserChat() {
                         <img src={msg.image_url} alt="image" style={{ maxWidth: '100%', borderRadius: 12, marginBottom: 8, cursor: 'pointer' }} onClick={() => window.open(msg.image_url)} />
                       )}
                       {msg.content && <div style={{ fontSize: 15 }}>{msg.content}</div>}
-                      <div style={{ fontSize: 10, opacity: 0.6, marginTop: 4, textAlign: 'right' }}>{new Date(msg.created_at).toLocaleTimeString()}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 4 }}>
+                        <div style={{ fontSize: 10, opacity: 0.6 }}>{new Date(msg.created_at).toLocaleTimeString()}</div>
+                        {isOutgoing && msg.read_by && msg.read_by.length > 0 && (
+                          <div style={{ fontSize: 10, opacity: 0.6 }}>✓ Прочитано</div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -173,7 +248,7 @@ export default function UserChat() {
             </div>
           </>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#8e8e93' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#fff' }}>
             Выберите чат
           </div>
         )}
