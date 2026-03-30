@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { translations } from '../i18n/translations';
 import Settings from './Settings';
 import SystemMonitoring from './SystemMonitoring';
+import Rooms from './Rooms';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -220,7 +221,12 @@ const AdminDashboard = ({ onLogout }) => {
                   <p className="text-sm text-slate-400">{t('admin_panel')}</p>
                 </div>
               </div>
-              
+              <Link to="/admin/rooms">
+  <Button variant={isActive('/admin/rooms') ? "default" : "ghost"} className="justify-start">
+    <MessageSquare className="mr-2 h-4 w-4" />
+    {t('rooms')}
+  </Button>
+</Link>
               <nav className="flex items-center space-x-2">
                 <Link to="/admin">
                   <Button
@@ -230,6 +236,7 @@ const AdminDashboard = ({ onLogout }) => {
                     <LayoutDashboard className="w-4 h-4 mr-2" />
                     {t('dashboard')}
                   </Button>
+<button onClick={() => setActiveTab('rooms')}>Комнаты</button>
                 </Link>
                 <Link to="/admin/settings">
                   <Button
@@ -273,6 +280,7 @@ const AdminDashboard = ({ onLogout }) => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Routes>
+<Route path="/rooms" element={<Rooms />} />
           <Route path="/" element={
             <>
         {/* Stats Cards */}

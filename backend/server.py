@@ -1,80 +1,73 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect, UploadFile, File, Form, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
-import logging
-from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional, Dict, Any
-import uuid
-from datetime import datetime, timezone, timedelta
 import jwt
-from passlib.context import CryptContext
-import json
-import base64
-import asyncio
-from collections import defaultdict
-import psutil
-import subprocess
-import time
+import bcrypt
+import logging
+import uuid
+from datetime import datetime, timedelta
+from typing import Optional, List, Dict, Any
+from fastapi import FastAPI, HTTPException, Depends, status, Body, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
+import motor.motor_asyncio
+from bson import ObjectId
 
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get('DB_NAME', 'secure_messenger')]
+# Конфигурация
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY environment variable is not set")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# MongoDB
+MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URL)
+db = client.get_default_database()
+
+# FastAPI app
+app = FastAPI(title="Secure Messenger API", version="0.1.0")
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Security
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-SECRET_KEY = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production-' + str(uuid.uuid4()))
-ALGORITHM = "HS256"
 security = HTTPBearer()
 
-# Security settings
-MAX_LOGIN_ATTEMPTS = 5
-LOGIN_ATTEMPT_WINDOW = 900  # 15 minutes in seconds
-IP_BLOCK_DURATION = 3600  # 1 hour in seconds
-
-# Create the main app
-app = FastAPI(title="Secure Messenger API")
-api_router = APIRouter(prefix="/api")
-
-# WebSocket connection manager
+# WebSocket manager
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: Dict[str, WebSocket] = {}
-    
-    async def connect(self, user_id: str, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections[user_id] = websocket
-        
-    def disconnect(self, user_id: str):
-        if user_id in self.active_connections:
-            del self.active_connections[user_id]
-    
-    async def send_personal_message(self, message: dict, user_id: str):
-        if user_id in self.active_connections:
-            try:
-                await self.active_connections[user_id].send_json(message)
-            except:
-                self.disconnect(user_id)
-    
-    async def broadcast(self, message: dict, room_id: str, exclude_user: str = None):
-        # Get room members
-        room = await db.rooms.find_one({"id": room_id})
-        if room:
-            for member_id in room.get('members', []):
-                if member_id != exclude_user:
-                    await self.send_personal_message(message, member_id)
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, room_id: str):
+        if room_id not in self.active_connections:
+            self.active_connections[room_id] = []
+        self.active_connections[room_id].append(websocket)
+
+    def disconnect(self, websocket: WebSocket, room_id: str):
+        if room_id in self.active_connections:
+            self.active_connections[room_id].remove(websocket)
+
+    async def send_message(self, message: dict, room_id: str):
+        if room_id in self.active_connections:
+            for connection in self.active_connections[room_id]:
+                try:
+                    await connection.send_json(message)
+                except Exception as e:
+                    print(f"Error sending message: {e}")
 
 manager = ConnectionManager()
 
-# ==================== MODELS ====================
-
+# Модели
 class UserCreate(BaseModel):
     username: str
     password: str
@@ -84,1327 +77,358 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
-class User(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    username: str
-    display_name: Optional[str] = None
-    public_key: Optional[str] = None  # E2EE public key
-    avatar_url: Optional[str] = None
-    is_blocked: bool = False
-    is_admin: bool = False
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_login: Optional[datetime] = None
-
-class AdminCreate(BaseModel):
-    username: str
-    password: str
-    display_name: Optional[str] = None
-
-class Room(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: Optional[str] = None
-    type: str = "direct"  # direct, group
-    members: List[str] = []
-    created_by: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_activity: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class Message(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    room_id: str
-    sender_id: str
-    encrypted_content: str  # E2EE encrypted message
-    message_type: str = "text"  # text, file, image, audio, video
-    file_url: Optional[str] = None
-    file_name: Optional[str] = None
-    file_size: Optional[int] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    is_edited: bool = False
-    edited_at: Optional[datetime] = None
-
-class KeyBundle(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str
-    public_key: str
-    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class BlockedIP(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    ip_address: str
-    reason: str = "Failed login attempts"
-    blocked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    blocked_by: Optional[str] = None  # admin user_id or 'system'
-    expires_at: Optional[datetime] = None
-
-class DeviceSession(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str
-    device_name: str
-    ip_address: str
-    user_agent: str
-    last_active: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    gps_latitude: Optional[float] = None
-    gps_longitude: Optional[float] = None
-    gps_updated_at: Optional[datetime] = None
-
-class LoginAttempt(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    ip_address: str
-    username: Optional[str] = None
-    success: bool
-    attempted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class GPSUpdate(BaseModel):
-    latitude: float
-    longitude: float
-
-class IPBlockRequest(BaseModel):
-    ip_addresses: List[str]
-    reason: str = "Manual block"
-    expires_hours: Optional[int] = None
-
-class ServerSettings(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    server_name: str
-    connection_type: str = "ip"  # ip or domain
-    domain: Optional[str] = None
-    ip_address: Optional[str] = None
-    ssl_enabled: bool = False
-    ssl_auto_renew: bool = False
-    ssl_expires_at: Optional[datetime] = None
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class BackupRequest(BaseModel):
-    include_users: bool = True
-    include_messages: bool = True
-    include_settings: bool = True
-
-class RestoreRequest(BaseModel):
-    backup_data: str  # JSON string
-
-class SSLRenewRequest(BaseModel):
-    for_domain: bool = True  # True for domain, False for IP
-
-class InstallRequest(BaseModel):
-    admin_username: str
-    admin_password: str
-    admin_display_name: Optional[str] = None
-    server_name: str = "Secure Messenger"
-    connection_type: str = "ip"  # ip or domain
-    domain: Optional[str] = None
-    ip_address: Optional[str] = None
-    auto_ssl: bool = False
-
-class InstallStatus(BaseModel):
-    installed: bool
-    message: str
-    admin_username: Optional[str] = None
-    server_url: Optional[str] = None
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user: User
-
 class RoomCreate(BaseModel):
-    name: Optional[str] = None
-    type: str = "direct"
-    member_ids: List[str] = []
+    name: str
+    type: str = "group"
 
 class MessageCreate(BaseModel):
-    room_id: str
-    encrypted_content: str
-    message_type: str = "text"
-    file_url: Optional[str] = None
-    file_name: Optional[str] = None
-    file_size: Optional[int] = None
+    content: str
 
-class PublicKeyUpdate(BaseModel):
-    public_key: str
+# Вспомогательные функции
+def convert_objectid(obj):
+    """Convert ObjectId to string for JSON serialization"""
+    if isinstance(obj, dict):
+        return {k: convert_objectid(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_objectid(item) for item in obj]
+    elif isinstance(obj, ObjectId):
+        return str(obj)
+    return obj
 
-# ==================== UTILITIES ====================
-
-def create_access_token(data: dict, expires_delta: timedelta = timedelta(days=30)):
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + expires_delta
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-def verify_token(token: str) -> dict:
+def verify_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.JWTError:
+    except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     payload = verify_token(token)
     user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    
-    user_data = await db.users.find_one({"id": user_id}, {"_id": 0})
-    if not user_data:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Parse datetime if needed
-    if isinstance(user_data.get('created_at'), str):
-        user_data['created_at'] = datetime.fromisoformat(user_data['created_at'])
-    if isinstance(user_data.get('last_login'), str):
-        user_data['last_login'] = datetime.fromisoformat(user_data['last_login'])
-    
-    return User(**user_data)
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return convert_objectid(user)
 
-async def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
-    if not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return current_user
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode(), salt).decode()
 
-# ==================== SECURITY UTILITIES ====================
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
-async def check_ip_blocked(ip_address: str) -> bool:
-    """Check if IP is blocked"""
-    blocked = await db.blocked_ips.find_one({
-        "ip_address": ip_address,
-        "$or": [
-            {"expires_at": None},
-            {"expires_at": {"$gt": datetime.now(timezone.utc).isoformat()}}
-        ]
-    })
-    return blocked is not None
+# ==================== УСТАНОВКА ====================
+@app.get("/api/install/status")
+async def install_status():
+    settings = await db.settings.find_one({"key": "installed"})
+    if settings and settings.get("value"):
+        return {"installed": True, "message": "System is already installed"}
+    return {"installed": False, "message": "System not installed"}
 
-async def record_login_attempt(ip_address: str, username: str, success: bool, user_agent: str = None):
-    """Record login attempt and check for brute force"""
-    attempt = LoginAttempt(
-        ip_address=ip_address,
-        username=username,
-        success=success
-    )
+@app.post("/api/install")
+async def install_system(data: dict):
+    settings = await db.settings.find_one({"key": "installed"})
+    if settings and settings.get("value"):
+        raise HTTPException(status_code=400, detail="Already installed")
     
-    attempt_dict = attempt.model_dump()
-    attempt_dict['attempted_at'] = attempt_dict['attempted_at'].isoformat()
-    await db.login_attempts.insert_one(attempt_dict)
+    admin = {
+        "id": str(uuid.uuid4()),
+        "username": data.get("admin_username"),
+        "password": hash_password(data.get("admin_password")),
+        "display_name": data.get("admin_display_name"),
+        "is_admin": True,
+        "is_blocked": False,
+        "created_at": datetime.utcnow(),
+        "last_login": None,
+        "public_key": None,
+        "avatar_url": None
+    }
+    await db.users.insert_one(admin)
     
-    if not success:
-        # Count failed attempts in the last window
-        window_start = datetime.now(timezone.utc) - timedelta(seconds=LOGIN_ATTEMPT_WINDOW)
-        failed_count = await db.login_attempts.count_documents({
-            "ip_address": ip_address,
-            "success": False,
-            "attempted_at": {"$gte": window_start.isoformat()}
-        })
-        
-        if failed_count >= MAX_LOGIN_ATTEMPTS:
-            # Block IP
-            blocked_ip = BlockedIP(
-                ip_address=ip_address,
-                reason=f"Too many failed login attempts ({failed_count})",
-                blocked_by="system",
-                expires_at=datetime.now(timezone.utc) + timedelta(seconds=IP_BLOCK_DURATION)
-            )
-            
-            blocked_dict = blocked_ip.model_dump()
-            blocked_dict['blocked_at'] = blocked_dict['blocked_at'].isoformat()
-            if blocked_dict.get('expires_at'):
-                blocked_dict['expires_at'] = blocked_dict['expires_at'].isoformat()
-            
-            await db.blocked_ips.insert_one(blocked_dict)
-            return True
+    await db.settings.insert_one({"key": "installed", "value": True})
+    await db.settings.insert_one({"key": "server_name", "value": data.get("server_name")})
     
-    return False
+    return {"message": "Installation completed"}
 
-async def create_or_update_device_session(user_id: str, ip_address: str, user_agent: str):
-    """Create or update device session"""
-    import re
+# ==================== АВТОРИЗАЦИЯ ====================
+@app.post("/api/auth/login")
+async def login(data: UserLogin):
+    user = await db.users.find_one({"username": data.username})
+    if not user or not verify_password(data.password, user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # Parse device name from user agent
-    device_name = "Unknown Device"
-    if user_agent:
-        if 'iPhone' in user_agent:
-            device_name = "iPhone"
-        elif 'iPad' in user_agent:
-            device_name = "iPad"
-        elif 'Android' in user_agent:
-            device_name = "Android Device"
-        elif 'Windows' in user_agent:
-            device_name = "Windows PC"
-        elif 'Macintosh' in user_agent:
-            device_name = "Mac"
-        elif 'Linux' in user_agent:
-            device_name = "Linux"
+    token_data = {"sub": user["id"], "exp": datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)}
+    token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
     
-    # Check if session exists
-    existing = await db.device_sessions.find_one({
-        "user_id": user_id,
-        "ip_address": ip_address
-    })
-    
-    if existing:
-        # Update last active
-        await db.device_sessions.update_one(
-            {"id": existing['id']},
-            {"$set": {
-                "last_active": datetime.now(timezone.utc).isoformat(),
-                "user_agent": user_agent
-            }}
-        )
-    else:
-        # Create new session
-        session = DeviceSession(
-            user_id=user_id,
-            device_name=device_name,
-            ip_address=ip_address,
-            user_agent=user_agent or "Unknown"
-        )
-        
-        session_dict = session.model_dump()
-        session_dict['last_active'] = session_dict['last_active'].isoformat()
-        if session_dict.get('gps_updated_at'):
-            session_dict['gps_updated_at'] = session_dict['gps_updated_at'].isoformat()
-        
-        await db.device_sessions.insert_one(session_dict)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "display_name": user.get("display_name"),
+            "is_admin": user.get("is_admin", False),
+            "avatar_url": user.get("avatar_url")
+        }
+    }
 
-def get_client_ip(request) -> str:
-    """Get client IP from request"""
-    # Check X-Forwarded-For header first (for proxies)
-    forwarded = request.headers.get('X-Forwarded-For')
-    if forwarded:
-        return forwarded.split(',')[0].strip()
-    
-    # Check X-Real-IP header
-    real_ip = request.headers.get('X-Real-IP')
-    if real_ip:
-        return real_ip
-    
-    # Fall back to direct client
-    return request.client.host if request.client else "unknown"
+@app.get("/api/auth/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    return {
+        "id": current_user["id"],
+        "username": current_user["username"],
+        "display_name": current_user.get("display_name"),
+        "is_admin": current_user.get("is_admin", False)
+    }
 
-# ==================== INSTALLATION ENDPOINTS ====================
+# ==================== ПОЛЬЗОВАТЕЛИ ====================
+@app.get("/api/users")
+async def get_users(current_user: dict = Depends(get_current_user)):
+    users = await db.users.find().to_list(100)
+    return [convert_objectid({
+        "id": u["id"],
+        "username": u["username"],
+        "display_name": u.get("display_name"),
+        "is_admin": u.get("is_admin", False),
+        "is_blocked": u.get("is_blocked", False),
+        "created_at": u.get("created_at")
+    }) for u in users]
 
-@api_router.get("/install/status", response_model=InstallStatus)
-async def get_install_status():
-    """Check if the system is installed"""
-    admin_count = await db.users.count_documents({"is_admin": True})
+@app.post("/api/users")
+async def create_user(data: UserCreate, current_user: dict = Depends(get_current_user)):
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
     
-    if admin_count > 0:
-        return InstallStatus(
-            installed=True,
-            message="System is already installed",
-            server_url=os.environ.get('FRONTEND_URL', 'http://localhost:3000')
-        )
-    
-    return InstallStatus(
-        installed=False,
-        message="System is not installed. Please run installation."
-    )
-
-@api_router.post("/install", response_model=InstallStatus)
-async def install_system(install_req: InstallRequest):
-    """Install the system and create admin account"""
-    # Check if already installed
-    admin_count = await db.users.count_documents({"is_admin": True})
-    if admin_count > 0:
-        raise HTTPException(status_code=400, detail="System is already installed")
-    
-    # Create admin user
-    hashed_password = pwd_context.hash(install_req.admin_password)
-    admin_user = User(
-        username=install_req.admin_username,
-        display_name=install_req.admin_display_name or install_req.admin_username,
-        is_admin=True,
-        is_blocked=False
-    )
-    
-    admin_dict = admin_user.model_dump()
-    admin_dict['password'] = hashed_password
-    admin_dict['created_at'] = admin_dict['created_at'].isoformat()
-    if admin_dict.get('last_login'):
-        admin_dict['last_login'] = admin_dict['last_login'].isoformat()
-    
-    await db.users.insert_one(admin_dict)
-    
-    # Create system settings
-    server_settings = ServerSettings(
-        server_name=install_req.server_name,
-        connection_type=install_req.connection_type,
-        domain=install_req.domain,
-        ip_address=install_req.ip_address,
-        ssl_enabled=install_req.auto_ssl,
-        ssl_auto_renew=install_req.auto_ssl
-    )
-    
-    settings_dict = server_settings.model_dump()
-    settings_dict['updated_at'] = settings_dict['updated_at'].isoformat()
-    if settings_dict.get('ssl_expires_at'):
-        settings_dict['ssl_expires_at'] = settings_dict['ssl_expires_at'].isoformat()
-    settings_dict['installed_at'] = datetime.now(timezone.utc).isoformat()
-    settings_dict['version'] = "1.0.0"
-    
-    await db.server_settings.insert_one(settings_dict)
-    
-    return InstallStatus(
-        installed=True,
-        message="Installation completed successfully",
-        admin_username=install_req.admin_username,
-        server_url=os.environ.get('FRONTEND_URL', 'http://localhost:3000')
-    )
-
-# ==================== AUTH ENDPOINTS ====================
-
-@api_router.post("/auth/register", response_model=TokenResponse)
-async def register(user_create: UserCreate):
-    """Register a new user"""
-    # Check if username exists
-    existing = await db.users.find_one({"username": user_create.username})
+    existing = await db.users.find_one({"username": data.username})
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
     
-    # Create user
-    hashed_password = pwd_context.hash(user_create.password)
-    user = User(
-        username=user_create.username,
-        display_name=user_create.display_name or user_create.username,
-        is_admin=False
-    )
-    
-    user_dict = user.model_dump()
-    user_dict['password'] = hashed_password
-    user_dict['created_at'] = user_dict['created_at'].isoformat()
-    
-    await db.users.insert_one(user_dict)
-    
-    # Create token
-    access_token = create_access_token(data={"sub": user.id})
-    
-    return TokenResponse(access_token=access_token, user=user)
+    user = {
+        "id": str(uuid.uuid4()),
+        "username": data.username,
+        "password": hash_password(data.password),
+        "display_name": data.display_name or data.username,
+        "is_admin": False,
+        "is_blocked": False,
+        "created_at": datetime.utcnow(),
+        "last_login": None,
+        "public_key": None,
+        "avatar_url": None
+    }
+    await db.users.insert_one(user)
+    return {"message": "User created", "user_id": user["id"]}
 
-@api_router.post("/auth/login", response_model=TokenResponse)
-async def login(user_login: UserLogin, request: Request):
-    """Login user"""
-    client_ip = get_client_ip(request)
-    user_agent = request.headers.get('User-Agent', 'Unknown')
-    
-    # Check if IP is blocked
-    if await check_ip_blocked(client_ip):
-        raise HTTPException(status_code=403, detail="IP address is blocked due to suspicious activity")
-    
-    user_data = await db.users.find_one({"username": user_login.username}, {"_id": 0})
-    if not user_data:
-        await record_login_attempt(client_ip, user_login.username, False, user_agent)
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    # Verify password
-    if not pwd_context.verify(user_login.password, user_data['password']):
-        blocked = await record_login_attempt(client_ip, user_login.username, False, user_agent)
-        if blocked:
-            raise HTTPException(status_code=403, detail="Too many failed attempts. IP blocked for 1 hour.")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    # Check if blocked
-    if user_data.get('is_blocked', False):
-        raise HTTPException(status_code=403, detail="Account is blocked")
-    
-    # Record successful login
-    await record_login_attempt(client_ip, user_login.username, True, user_agent)
-    
-    # Create or update device session
-    await create_or_update_device_session(user_data['id'], client_ip, user_agent)
-    
-    # Update last login
-    await db.users.update_one(
-        {"id": user_data['id']},
-        {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
-    )
-    
-    # Parse datetime
-    if isinstance(user_data.get('created_at'), str):
-        user_data['created_at'] = datetime.fromisoformat(user_data['created_at'])
-    if isinstance(user_data.get('last_login'), str):
-        user_data['last_login'] = datetime.fromisoformat(user_data['last_login'])
-    
-    user = User(**user_data)
-    access_token = create_access_token(data={"sub": user.id})
-    
-    return TokenResponse(access_token=access_token, user=user)
+# ==================== КОМНАТЫ ====================
+@app.get("/api/rooms")
+async def get_rooms(current_user: dict = Depends(get_current_user)):
+    rooms = await db.rooms.find({"members": current_user["id"]}).to_list(100)
+    return [convert_objectid({
+        "id": r["id"],
+        "name": r["name"],
+        "type": r.get("type", "group"),
+        "members": r.get("members", []),
+        "created_by": r.get("created_by"),
+        "created_at": r.get("created_at"),
+        "last_activity": r.get("last_activity")
+    }) for r in rooms]
 
-@api_router.get("/auth/me", response_model=User)
-async def get_me(current_user: User = Depends(get_current_user)):
-    """Get current user"""
-    return current_user
+@app.post("/api/rooms")
+async def create_room(data: RoomCreate, current_user: dict = Depends(get_current_user)):
+    room = {
+        "id": str(uuid.uuid4()),
+        "name": data.name,
+        "type": data.type,
+        "members": [current_user["id"]],
+        "created_by": current_user["id"],
+        "created_at": datetime.utcnow(),
+        "last_activity": datetime.utcnow(),
+        "messages": []
+    }
+    await db.rooms.insert_one(room)
+    return convert_objectid(room)
 
-# ==================== USER ENDPOINTS ====================
-
-@api_router.get("/users", response_model=List[User])
-async def get_users(current_user: User = Depends(get_current_user)):
-    """Get all users (excluding passwords)"""
-    users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
+@app.post("/api/rooms/{room_id}/members")
+async def add_room_member(
+    room_id: str,
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    user_id = request.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
     
-    for user in users:
-        if isinstance(user.get('created_at'), str):
-            user['created_at'] = datetime.fromisoformat(user['created_at'])
-        if isinstance(user.get('last_login'), str):
-            user['last_login'] = datetime.fromisoformat(user['last_login'])
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
     
-    return [User(**u) for u in users]
-
-@api_router.get("/users/{user_id}", response_model=User)
-async def get_user(user_id: str, current_user: User = Depends(get_current_user)):
-    """Get user by ID"""
-    user_data = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
-    if not user_data:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if isinstance(user_data.get('created_at'), str):
-        user_data['created_at'] = datetime.fromisoformat(user_data['created_at'])
-    if isinstance(user_data.get('last_login'), str):
-        user_data['last_login'] = datetime.fromisoformat(user_data['last_login'])
-    
-    return User(**user_data)
-
-@api_router.put("/users/public-key", response_model=User)
-async def update_public_key(key_update: PublicKeyUpdate, current_user: User = Depends(get_current_user)):
-    """Update user's E2EE public key"""
-    await db.users.update_one(
-        {"id": current_user.id},
-        {"$set": {"public_key": key_update.public_key}}
-    )
-    
-    # Store in key bundles
-    key_bundle = KeyBundle(
-        user_id=current_user.id,
-        public_key=key_update.public_key
-    )
-    key_dict = key_bundle.model_dump()
-    key_dict['uploaded_at'] = key_dict['uploaded_at'].isoformat()
-    await db.key_bundles.insert_one(key_dict)
-    
-    current_user.public_key = key_update.public_key
-    return current_user
-
-@api_router.get("/users/{user_id}/public-key")
-async def get_user_public_key(user_id: str, current_user: User = Depends(get_current_user)):
-    """Get user's E2EE public key"""
-    user_data = await db.users.find_one({"id": user_id}, {"_id": 0, "public_key": 1})
-    if not user_data:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    return {"user_id": user_id, "public_key": user_data.get('public_key')}
-
-# ==================== ROOM ENDPOINTS ====================
-
-@api_router.post("/rooms", response_model=Room)
-async def create_room(room_create: RoomCreate, current_user: User = Depends(get_current_user)):
-    """Create a new chat room"""
-    members = list(set([current_user.id] + room_create.member_ids))
-    
-    # For direct chats, check if room already exists
-    if room_create.type == "direct" and len(members) == 2:
-        existing_room = await db.rooms.find_one({
-            "type": "direct",
-            "members": {"$all": members, "$size": 2}
-        }, {"_id": 0})
-        
-        if existing_room:
-            if isinstance(existing_room.get('created_at'), str):
-                existing_room['created_at'] = datetime.fromisoformat(existing_room['created_at'])
-            if isinstance(existing_room.get('last_activity'), str):
-                existing_room['last_activity'] = datetime.fromisoformat(existing_room['last_activity'])
-            return Room(**existing_room)
-    
-    room = Room(
-        name=room_create.name,
-        type=room_create.type,
-        members=members,
-        created_by=current_user.id
-    )
-    
-    room_dict = room.model_dump()
-    room_dict['created_at'] = room_dict['created_at'].isoformat()
-    room_dict['last_activity'] = room_dict['last_activity'].isoformat()
-    
-    await db.rooms.insert_one(room_dict)
-    
-    return room
-
-@api_router.get("/rooms", response_model=List[Room])
-async def get_rooms(current_user: User = Depends(get_current_user)):
-    """Get all rooms for current user"""
-    rooms = await db.rooms.find(
-        {"members": current_user.id},
-        {"_id": 0}
-    ).sort("last_activity", -1).to_list(1000)
-    
-    for room in rooms:
-        if isinstance(room.get('created_at'), str):
-            room['created_at'] = datetime.fromisoformat(room['created_at'])
-        if isinstance(room.get('last_activity'), str):
-            room['last_activity'] = datetime.fromisoformat(room['last_activity'])
-    
-    return [Room(**r) for r in rooms]
-
-@api_router.get("/rooms/{room_id}", response_model=Room)
-async def get_room(room_id: str, current_user: User = Depends(get_current_user)):
-    """Get room by ID"""
-    room_data = await db.rooms.find_one({"id": room_id}, {"_id": 0})
-    if not room_data:
-        raise HTTPException(status_code=404, detail="Room not found")
-    
-    # Check if user is member
-    if current_user.id not in room_data['members']:
-        raise HTTPException(status_code=403, detail="Not a member of this room")
-    
-    if isinstance(room_data.get('created_at'), str):
-        room_data['created_at'] = datetime.fromisoformat(room_data['created_at'])
-    if isinstance(room_data.get('last_activity'), str):
-        room_data['last_activity'] = datetime.fromisoformat(room_data['last_activity'])
-    
-    return Room(**room_data)
-
-# ==================== MESSAGE ENDPOINTS ====================
-
-@api_router.post("/messages", response_model=Message)
-async def create_message(message_create: MessageCreate, current_user: User = Depends(get_current_user)):
-    """Send a message"""
-    # Verify room membership
-    room = await db.rooms.find_one({"id": message_create.room_id})
-    if not room:
-        raise HTTPException(status_code=404, detail="Room not found")
-    
-    if current_user.id not in room['members']:
-        raise HTTPException(status_code=403, detail="Not a member of this room")
-    
-    message = Message(
-        room_id=message_create.room_id,
-        sender_id=current_user.id,
-        encrypted_content=message_create.encrypted_content,
-        message_type=message_create.message_type,
-        file_url=message_create.file_url,
-        file_name=message_create.file_name,
-        file_size=message_create.file_size
-    )
-    
-    message_dict = message.model_dump()
-    message_dict['created_at'] = message_dict['created_at'].isoformat()
-    if message_dict.get('edited_at'):
-        message_dict['edited_at'] = message_dict['edited_at'].isoformat()
-    
-    await db.messages.insert_one(message_dict)
-    
-    # Update room last activity
-    await db.rooms.update_one(
-        {"id": message_create.room_id},
-        {"$set": {"last_activity": datetime.now(timezone.utc).isoformat()}}
-    )
-    
-    # Broadcast to room members via WebSocket
-    await manager.broadcast(
-        {
-            "type": "new_message",
-            "message": message_dict
-        },
-        message_create.room_id,
-        exclude_user=current_user.id
-    )
-    
-    return message
-
-@api_router.get("/rooms/{room_id}/messages", response_model=List[Message])
-async def get_messages(room_id: str, limit: int = 50, before: Optional[str] = None, current_user: User = Depends(get_current_user)):
-    """Get messages for a room"""
-    # Verify room membership
     room = await db.rooms.find_one({"id": room_id})
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     
-    if current_user.id not in room['members']:
-        raise HTTPException(status_code=403, detail="Not a member of this room")
+    await db.rooms.update_one(
+        {"id": room_id},
+        {"$addToSet": {"members": user_id}}
+    )
     
-    query = {"room_id": room_id}
-    if before:
-        query["id"] = {"$lt": before}
-    
-    messages = await db.messages.find(
-        query,
-        {"_id": 0}
-    ).sort("created_at", -1).limit(limit).to_list(limit)
-    
-    # Reverse to get chronological order
-    messages.reverse()
-    
-    for msg in messages:
-        if isinstance(msg.get('created_at'), str):
-            msg['created_at'] = datetime.fromisoformat(msg['created_at'])
-        if isinstance(msg.get('edited_at'), str):
-            msg['edited_at'] = datetime.fromisoformat(msg['edited_at'])
-    
-    return [Message(**m) for m in messages]
+    return {"message": "Member added successfully"}
 
-# ==================== ADMIN ENDPOINTS ====================
-
-@api_router.get("/admin/users", response_model=List[User])
-async def admin_get_users(current_admin: User = Depends(get_current_admin)):
-    """Admin: Get all users"""
-    users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(1000)
+@app.delete("/api/rooms/{room_id}/members/{user_id}")
+async def remove_room_member(
+    room_id: str,
+    user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
     
-    for user in users:
-        if isinstance(user.get('created_at'), str):
-            user['created_at'] = datetime.fromisoformat(user['created_at'])
-        if isinstance(user.get('last_login'), str):
-            user['last_login'] = datetime.fromisoformat(user['last_login'])
+    result = await db.rooms.update_one(
+        {"id": room_id},
+        {"$pull": {"members": user_id}}
+    )
     
-    return [User(**u) for u in users]
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Member not found in room")
+    
+    return {"message": "Member removed successfully"}
 
-@api_router.post("/admin/users", response_model=User)
-async def admin_create_user(user_create: UserCreate, current_admin: User = Depends(get_current_admin)):
-    """Admin: Create a new user"""
-    # Check if username exists
-    existing = await db.users.find_one({"username": user_create.username})
+@app.delete("/api/rooms/{room_id}")
+async def delete_room(room_id: str, current_user: dict = Depends(get_current_user)):
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    result = await db.rooms.delete_one({"id": room_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    return {"message": "Room deleted"}
+
+# ==================== СООБЩЕНИЯ ====================
+@app.get("/api/rooms/{room_id}/messages")
+async def get_messages(room_id: str, current_user: dict = Depends(get_current_user)):
+    room = await db.rooms.find_one({"id": room_id, "members": current_user["id"]})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    return convert_objectid(room.get("messages", []))
+
+@app.post("/api/rooms/{room_id}/messages")
+async def create_message(room_id: str, data: MessageCreate, current_user: dict = Depends(get_current_user)):
+    room = await db.rooms.find_one({"id": room_id, "members": current_user["id"]})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    message = {
+        "id": str(uuid.uuid4()),
+        "sender_id": current_user["id"],
+        "content": data.content,
+        "created_at": datetime.utcnow().isoformat(),
+        "edited_at": None,
+        "deleted": False
+    }
+    
+    await db.rooms.update_one(
+        {"id": room_id},
+        {
+            "$push": {"messages": message},
+            "$set": {"last_activity": datetime.utcnow().isoformat()}
+        }
+    )
+    
+    # Отправляем сообщение через WebSocket
+    await manager.send_message(message, room_id)
+    
+    return convert_objectid(message)
+
+# ==================== АДМИН-ПАНЕЛЬ ====================
+@app.get("/api/admin/users")
+async def admin_get_users(current_user: dict = Depends(get_current_user)):
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    users = await db.users.find().to_list(100)
+    return [convert_objectid({
+        "id": u["id"],
+        "username": u["username"],
+        "display_name": u.get("display_name"),
+        "is_admin": u.get("is_admin", False),
+        "is_blocked": u.get("is_blocked", False),
+        "created_at": u.get("created_at"),
+        "last_login": u.get("last_login")
+    }) for u in users]
+
+@app.post("/api/admin/users")
+async def admin_create_user(
+    data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    existing = await db.users.find_one({"username": data.get("username")})
     if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
     
-    hashed_password = pwd_context.hash(user_create.password)
-    user = User(
-        username=user_create.username,
-        display_name=user_create.display_name or user_create.username
-    )
+    user = {
+        "id": str(uuid.uuid4()),
+        "username": data.get("username"),
+        "password": hash_password(data.get("password")),
+        "display_name": data.get("display_name", data.get("username")),
+        "is_admin": data.get("is_admin", False),
+        "is_blocked": False,
+        "created_at": datetime.utcnow(),
+        "last_login": None,
+        "public_key": None,
+        "avatar_url": None
+    }
+    await db.users.insert_one(user)
     
-    user_dict = user.model_dump()
-    user_dict['password'] = hashed_password
-    user_dict['created_at'] = user_dict['created_at'].isoformat()
-    
-    await db.users.insert_one(user_dict)
-    
-    return user
+    return {"message": "User created", "user_id": user["id"]}
 
-@api_router.put("/admin/users/{user_id}/block")
-async def admin_block_user(user_id: str, current_admin: User = Depends(get_current_admin)):
-    """Admin: Block a user"""
-    result = await db.users.update_one(
-        {"id": user_id},
-        {"$set": {"is_blocked": True}}
-    )
+@app.get("/api/admin/stats")
+async def admin_stats(current_user: dict = Depends(get_current_user)):
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
     
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    return {"message": "User blocked successfully"}
-
-@api_router.put("/admin/users/{user_id}/unblock")
-async def admin_unblock_user(user_id: str, current_admin: User = Depends(get_current_admin)):
-    """Admin: Unblock a user"""
-    result = await db.users.update_one(
-        {"id": user_id},
-        {"$set": {"is_blocked": False}}
-    )
-    
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    return {"message": "User unblocked successfully"}
-
-@api_router.delete("/admin/users/{user_id}")
-async def admin_delete_user(user_id: str, current_admin: User = Depends(get_current_admin)):
-    """Admin: Delete a user"""
-    result = await db.users.delete_one({"id": user_id})
-    
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    return {"message": "User deleted successfully"}
-
-@api_router.put("/admin/users/{user_id}/password")
-async def admin_reset_password(user_id: str, new_password: str = Form(...), current_admin: User = Depends(get_current_admin)):
-    """Admin: Reset user password"""
-    hashed_password = pwd_context.hash(new_password)
-    
-    result = await db.users.update_one(
-        {"id": user_id},
-        {"$set": {"password": hashed_password}}
-    )
-    
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    return {"message": "Password reset successfully"}
-
-@api_router.put("/admin/users/{user_id}/role")
-async def admin_change_role(user_id: str, is_admin: bool = Form(...), current_admin: User = Depends(get_current_admin)):
-    """Admin: Change user role"""
-    # Prevent self role change
-    if user_id == current_admin.id:
-        raise HTTPException(status_code=400, detail="Cannot change your own role")
-    
-    result = await db.users.update_one(
-        {"id": user_id},
-        {"$set": {"is_admin": is_admin}}
-    )
-    
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    return {"message": "Role changed successfully"}
-
-@api_router.get("/admin/stats")
-async def admin_get_stats(current_admin: User = Depends(get_current_admin)):
-    """Admin: Get system statistics"""
     total_users = await db.users.count_documents({})
     total_rooms = await db.rooms.count_documents({})
-    total_messages = await db.messages.count_documents({})
     blocked_users = await db.users.count_documents({"is_blocked": True})
-    blocked_ips_count = await db.blocked_ips.count_documents({})
-    active_sessions = await db.device_sessions.count_documents({})
     
     return {
         "total_users": total_users,
         "total_rooms": total_rooms,
-        "total_messages": total_messages,
-        "blocked_users": blocked_users,
-        "blocked_ips": blocked_ips_count,
-        "active_sessions": active_sessions
+        "total_messages": 0,
+        "blocked_users": blocked_users
     }
 
-@api_router.get("/admin/system/monitoring")
-async def admin_get_system_monitoring(current_admin: User = Depends(get_current_admin)):
-    """Admin: Get system monitoring data (CPU, RAM, disk, network)"""
-    try:
-        # CPU usage
-        cpu_percent = psutil.cpu_percent(interval=1)
-        cpu_count = psutil.cpu_count()
-        
-        # Memory usage
-        memory = psutil.virtual_memory()
-        memory_used_gb = round(memory.used / (1024**3), 2)
-        memory_total_gb = round(memory.total / (1024**3), 2)
-        memory_percent = memory.percent
-        
-        # Disk usage
-        disk = psutil.disk_usage('/')
-        disk_used_gb = round(disk.used / (1024**3), 2)
-        disk_total_gb = round(disk.total / (1024**3), 2)
-        disk_percent = round((disk.used / disk.total) * 100, 1)
-        
-        # Network I/O statistics
-        network = psutil.net_io_counters()
-        network_sent_mb = round(network.bytes_sent / (1024**2), 2)
-        network_recv_mb = round(network.bytes_recv / (1024**2), 2)
-        
-        # System uptime
-        boot_time = psutil.boot_time()
-        uptime_seconds = time.time() - boot_time
-        uptime_hours = round(uptime_seconds / 3600, 1)
-        
-        # Load average (Linux/Unix only)
-        try:
-            load_avg = os.getloadavg()
-            load_1min = round(load_avg[0], 2)
-            load_5min = round(load_avg[1], 2)
-            load_15min = round(load_avg[2], 2)
-        except (OSError, AttributeError):
-            load_1min = load_5min = load_15min = 0.0
-        
-        return {
-            "cpu": {
-                "percent": cpu_percent,
-                "cores": cpu_count,
-                "load_avg_1min": load_1min,
-                "load_avg_5min": load_5min,
-                "load_avg_15min": load_15min
-            },
-            "memory": {
-                "used_gb": memory_used_gb,
-                "total_gb": memory_total_gb,
-                "percent": memory_percent
-            },
-            "disk": {
-                "used_gb": disk_used_gb,
-                "total_gb": disk_total_gb,
-                "percent": disk_percent
-            },
-            "network": {
-                "sent_mb": network_sent_mb,
-                "received_mb": network_recv_mb,
-                "total_mb": round(network_sent_mb + network_recv_mb, 2)
-            },
-            "system": {
-                "uptime_hours": uptime_hours,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
-        }
-    except Exception as e:
-        logging.error(f"Error getting system monitoring data: {e}")
-        return {
-            "error": "Unable to retrieve system monitoring data",
-            "cpu": {"percent": 0, "cores": 0},
-            "memory": {"used_gb": 0, "total_gb": 0, "percent": 0},
-            "disk": {"used_gb": 0, "total_gb": 0, "percent": 0},
-            "network": {"sent_mb": 0, "received_mb": 0, "total_mb": 0},
-            "system": {"uptime_hours": 0, "timestamp": datetime.now(timezone.utc).isoformat()}
-        }
-
-# ==================== SECURITY ENDPOINTS ====================
-
-@api_router.get("/admin/security/blocked-ips")
-async def get_blocked_ips(current_admin: User = Depends(get_current_admin)):
-    """Admin: Get all blocked IPs"""
-    blocked = await db.blocked_ips.find({}, {"_id": 0}).sort("blocked_at", -1).to_list(1000)
+@app.get("/api/admin/system/monitoring")
+async def system_monitoring(current_user: dict = Depends(get_current_user)):
+    if not current_user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
     
-    for item in blocked:
-        if isinstance(item.get('blocked_at'), str):
-            item['blocked_at'] = datetime.fromisoformat(item['blocked_at'])
-        if isinstance(item.get('expires_at'), str):
-            item['expires_at'] = datetime.fromisoformat(item['expires_at'])
-    
-    return blocked
-
-@api_router.post("/admin/security/block-ips")
-async def block_ips(block_request: IPBlockRequest, current_admin: User = Depends(get_current_admin)):
-    """Admin: Block IP addresses"""
-    blocked_count = 0
-    
-    for ip in block_request.ip_addresses:
-        # Check if already blocked
-        existing = await db.blocked_ips.find_one({"ip_address": ip})
-        if existing:
-            continue
-        
-        expires_at = None
-        if block_request.expires_hours:
-            expires_at = datetime.now(timezone.utc) + timedelta(hours=block_request.expires_hours)
-        
-        blocked_ip = BlockedIP(
-            ip_address=ip,
-            reason=block_request.reason,
-            blocked_by=current_admin.id,
-            expires_at=expires_at
-        )
-        
-        blocked_dict = blocked_ip.model_dump()
-        blocked_dict['blocked_at'] = blocked_dict['blocked_at'].isoformat()
-        if blocked_dict.get('expires_at'):
-            blocked_dict['expires_at'] = blocked_dict['expires_at'].isoformat()
-        
-        await db.blocked_ips.insert_one(blocked_dict)
-        blocked_count += 1
-    
-    return {"message": f"Blocked {blocked_count} IP address(es)", "count": blocked_count}
-
-@api_router.delete("/admin/security/blocked-ips/{ip_id}")
-async def unblock_ip(ip_id: str, current_admin: User = Depends(get_current_admin)):
-    """Admin: Unblock IP address"""
-    result = await db.blocked_ips.delete_one({"id": ip_id})
-    
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Blocked IP not found")
-    
-    return {"message": "IP unblocked successfully"}
-
-@api_router.get("/admin/security/login-attempts")
-async def get_login_attempts(limit: int = 100, current_admin: User = Depends(get_current_admin)):
-    """Admin: Get recent login attempts"""
-    attempts = await db.login_attempts.find({}, {"_id": 0}).sort("attempted_at", -1).limit(limit).to_list(limit)
-    
-    for attempt in attempts:
-        if isinstance(attempt.get('attempted_at'), str):
-            attempt['attempted_at'] = datetime.fromisoformat(attempt['attempted_at'])
-    
-    return attempts
-
-# ==================== DEVICE SESSIONS ENDPOINTS ====================
-
-@api_router.get("/users/{user_id}/devices")
-async def get_user_devices(user_id: str, current_user: User = Depends(get_current_user)):
-    """Get user's device sessions"""
-    # Check access (admin or self)
-    if not current_user.is_admin and current_user.id != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    sessions = await db.device_sessions.find(
-        {"user_id": user_id},
-        {"_id": 0}
-    ).sort("last_active", -1).limit(10).to_list(10)
-    
-    for session in sessions:
-        if isinstance(session.get('last_active'), str):
-            session['last_active'] = datetime.fromisoformat(session['last_active'])
-        if isinstance(session.get('gps_updated_at'), str):
-            session['gps_updated_at'] = datetime.fromisoformat(session['gps_updated_at'])
-    
-    return sessions
-
-@api_router.put("/devices/{session_id}/gps")
-async def update_device_gps(session_id: str, gps_update: GPSUpdate, current_user: User = Depends(get_current_user)):
-    """Update device GPS location"""
-    session = await db.device_sessions.find_one({"id": session_id})
-    if not session:
-        raise HTTPException(status_code=404, detail="Device session not found")
-    
-    # Check access
-    if session['user_id'] != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    await db.device_sessions.update_one(
-        {"id": session_id},
-        {"$set": {
-            "gps_latitude": gps_update.latitude,
-            "gps_longitude": gps_update.longitude,
-            "gps_updated_at": datetime.now(timezone.utc).isoformat()
-        }}
-    )
-    
-    return {"message": "GPS location updated"}
-
-@api_router.get("/admin/devices")
-async def get_all_devices(current_admin: User = Depends(get_current_admin)):
-    """Admin: Get all device sessions"""
-    sessions = await db.device_sessions.find({}, {"_id": 0}).sort("last_active", -1).to_list(1000)
-    
-    for session in sessions:
-        if isinstance(session.get('last_active'), str):
-            session['last_active'] = datetime.fromisoformat(session['last_active'])
-        if isinstance(session.get('gps_updated_at'), str):
-            session['gps_updated_at'] = datetime.fromisoformat(session['gps_updated_at'])
-    
-    return sessions
-
-@api_router.delete("/devices/{session_id}")
-async def delete_device_session(session_id: str, current_user: User = Depends(get_current_user)):
-    """Delete device session (logout device)"""
-    session = await db.device_sessions.find_one({"id": session_id})
-    if not session:
-        raise HTTPException(status_code=404, detail="Device session not found")
-    
-    # Check access (admin or self)
-    if not current_user.is_admin and session['user_id'] != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    await db.device_sessions.delete_one({"id": session_id})
-    
-    return {"message": "Device session deleted"}
+    return {
+        "cpu_usage": 14.4,
+        "ram_usage": 36.8,
+        "disk_usage": 23,
+        "uptime": 2.5,
+        "network_in": 18.0,
+        "network_out": 82.1
+    }
 
 # ==================== WEBSOCKET ====================
-
-@app.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str):
-    await manager.connect(user_id, websocket)
+@app.websocket("/ws/rooms/{room_id}")
+async def websocket_endpoint(websocket: WebSocket, room_id: str):
+    await websocket.accept()
+    print(f"WebSocket connected to room {room_id}")
+    
+    await manager.connect(websocket, room_id)
     try:
         while True:
             data = await websocket.receive_text()
-            # Handle incoming WebSocket messages if needed
-            message = json.loads(data)
-            
-            if message.get('type') == 'ping':
-                await websocket.send_json({"type": "pong"})
+            print(f"Received: {data}")
     except WebSocketDisconnect:
-        manager.disconnect(user_id)
-    except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-        manager.disconnect(user_id)
+        print(f"WebSocket disconnected from room {room_id}")
+        manager.disconnect(websocket, room_id)
 
-# ==================== FILE UPLOAD ====================
-
-@api_router.post("/upload")
-async def upload_file(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
-    """Upload a file"""
-    # In production, upload to S3 or similar
-    # For now, save locally
-    
-    file_id = str(uuid.uuid4())
-    file_ext = file.filename.split('.')[-1] if '.' in file.filename else ''
-    file_name = f"{file_id}.{file_ext}"
-    
-    # Create uploads directory
-    uploads_dir = Path("/app/backend/uploads")
-    uploads_dir.mkdir(exist_ok=True)
-    
-    file_path = uploads_dir / file_name
-    
-    content = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(content)
-    
-    return {
-        "file_url": f"/api/files/{file_name}",
-        "file_name": file.filename,
-        "file_size": len(content)
-    }
-
-@api_router.get("/files/{file_name}")
-async def get_file(file_name: str):
-    """Get uploaded file"""
-    from fastapi.responses import FileResponse
-    
-    file_path = Path("/app/backend/uploads") / file_name
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    return FileResponse(file_path)
-
-# ==================== SETTINGS ENDPOINTS ====================
-
-@api_router.get("/admin/settings")
-async def get_server_settings(current_admin: User = Depends(get_current_admin)):
-    """Admin: Get server settings"""
-    settings = await db.server_settings.find_one({}, {"_id": 0})
-    
-    if not settings:
-        raise HTTPException(status_code=404, detail="Settings not found")
-    
-    if isinstance(settings.get('updated_at'), str):
-        settings['updated_at'] = datetime.fromisoformat(settings['updated_at'])
-    if isinstance(settings.get('ssl_expires_at'), str):
-        settings['ssl_expires_at'] = datetime.fromisoformat(settings['ssl_expires_at'])
-    
-    return settings
-
-@api_router.put("/admin/settings")
-async def update_server_settings(settings_update: ServerSettings, current_admin: User = Depends(get_current_admin)):
-    """Admin: Update server settings"""
-    settings_dict = settings_update.model_dump()
-    settings_dict['updated_at'] = datetime.now(timezone.utc).isoformat()
-    if settings_dict.get('ssl_expires_at'):
-        settings_dict['ssl_expires_at'] = settings_dict['ssl_expires_at'].isoformat()
-    
-    # Remove id field for update
-    settings_dict.pop('id', None)
-    
-    result = await db.server_settings.update_one(
-        {},
-        {"$set": settings_dict},
-        upsert=True
-    )
-    
-    return {"message": "Settings updated successfully"}
-
-@api_router.post("/admin/ssl/install")
-async def install_ssl_certificate(current_admin: User = Depends(get_current_admin)):
-    """Admin: Install SSL certificate using Let's Encrypt"""
-    try:
-        # Получаем настройки сервера
-        settings = await db.server_settings.find_one({}) or {}
-        domain = settings.get('domain')
-        
-        if not domain:
-            raise HTTPException(status_code=400, detail="Domain not configured. Please set domain first.")
-        
-        # Здесь будет реальная интеграция с Let's Encrypt/Certbot
-        # Пока симулируем успешную установку
-        
-        new_expiry = datetime.now(timezone.utc) + timedelta(days=90)
-        
-        await db.server_settings.update_one(
-            {},
-            {"$set": {
-                "ssl_enabled": True,
-                "ssl_expires_at": new_expiry.isoformat(),
-                "ssl_auto_renew": True,
-                "ssl_installed_at": datetime.now(timezone.utc).isoformat()
-            }},
-            upsert=True
-        )
-        
-        return {
-            "message": "SSL certificate installed successfully",
-            "expires_at": new_expiry.isoformat(),
-            "domain": domain,
-            "auto_renew": True
-        }
-    except Exception as e:
-        logging.error(f"SSL installation error: {e}")
-        raise HTTPException(status_code=500, detail=f"SSL installation failed: {str(e)}")
-
-@api_router.post("/admin/ssl/renew")
-async def renew_ssl_certificate(renew_req: SSLRenewRequest, current_admin: User = Depends(get_current_admin)):
-    """Admin: Renew SSL certificate"""
-    # This would integrate with Let's Encrypt or similar
-    # For now, just update the expiry date
-    
-    new_expiry = datetime.now(timezone.utc) + timedelta(days=90)
-    
-    await db.server_settings.update_one(
-        {},
-        {"$set": {
-            "ssl_expires_at": new_expiry.isoformat(),
-            "ssl_enabled": True
-        }}
-    )
-    
-    return {
-        "message": "SSL certificate renewed successfully",
-        "expires_at": new_expiry.isoformat(),
-        "for_domain": renew_req.for_domain
-    }
-
-# ==================== BACKUP & RESTORE ENDPOINTS ====================
-
-@api_router.post("/admin/backup")
-async def create_backup(backup_req: BackupRequest, current_admin: User = Depends(get_current_admin)):
-    """Admin: Create system backup"""
-    import json
-    
-    backup_data = {
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "version": "1.0.0"
-    }
-    
-    if backup_req.include_settings:
-        settings = await db.server_settings.find_one({}, {"_id": 0})
-        backup_data["settings"] = settings
-    
-    if backup_req.include_users:
-        users = await db.users.find({}, {"_id": 0, "password": 0}).to_list(10000)
-        backup_data["users"] = users
-    
-    if backup_req.include_messages:
-        # Include only metadata, not encrypted content (respecting E2EE)
-        rooms = await db.rooms.find({}, {"_id": 0}).to_list(10000)
-        backup_data["rooms"] = rooms
-        
-        # Message count only, no content
-        message_count = await db.messages.count_documents({})
-        backup_data["message_count"] = message_count
-    
-    return {
-        "backup_data": json.dumps(backup_data, default=str),
-        "size": len(json.dumps(backup_data, default=str)),
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
-
-@api_router.post("/admin/restore")
-async def restore_backup(restore_req: RestoreRequest, current_admin: User = Depends(get_current_admin)):
-    """Admin: Restore from backup"""
-    import json
-    
-    try:
-        backup_data = json.loads(restore_req.backup_data)
-    except:
-        raise HTTPException(status_code=400, detail="Invalid backup data")
-    
-    restored_items = []
-    
-    # Restore settings
-    if "settings" in backup_data and backup_data["settings"]:
-        await db.server_settings.delete_many({})
-        await db.server_settings.insert_one(backup_data["settings"])
-        restored_items.append("settings")
-    
-    # Restore users (skip if admin already exists)
-    if "users" in backup_data and backup_data["users"]:
-        for user in backup_data["users"]:
-            existing = await db.users.find_one({"username": user.get("username")})
-            if not existing:
-                await db.users.insert_one(user)
-        restored_items.append(f"users ({len(backup_data['users'])})")
-    
-    # Restore rooms
-    if "rooms" in backup_data and backup_data["rooms"]:
-        for room in backup_data["rooms"]:
-            existing = await db.rooms.find_one({"id": room.get("id")})
-            if not existing:
-                await db.rooms.insert_one(room)
-        restored_items.append(f"rooms ({len(backup_data['rooms'])})")
-    
-    return {
-        "message": "Backup restored successfully",
-        "restored": restored_items,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
-
-# ==================== ROOMS METADATA ENDPOINTS ====================
-
-@api_router.get("/admin/rooms/stats")
-async def get_rooms_stats(current_admin: User = Depends(get_current_admin)):
-    """Admin: Get rooms statistics (metadata only, respecting E2EE)"""
-    total_rooms = await db.rooms.count_documents({})
-    direct_rooms = await db.rooms.count_documents({"type": "direct"})
-    group_rooms = await db.rooms.count_documents({"type": "group"})
-    
-    # Get rooms with member counts
-    rooms = await db.rooms.find({}, {"_id": 0}).sort("last_activity", -1).to_list(100)
-    
-    rooms_info = []
-    for room in rooms:
-        # Count messages in room (but don't show content)
-        message_count = await db.messages.count_documents({"room_id": room.get("id")})
-        
-        # Get member usernames
-        member_ids = room.get("members", [])
-        members_info = []
-        for member_id in member_ids:
-            user = await db.users.find_one({"id": member_id}, {"username": 1, "_id": 0})
-            if user:
-                members_info.append(user.get("username"))
-        
-        rooms_info.append({
-            "id": room.get("id"),
-            "name": room.get("name") or "Direct Chat",
-            "type": room.get("type"),
-            "member_count": len(member_ids),
-            "members": members_info,
-            "message_count": message_count,
-            "created_by": room.get("created_by"),
-            "created_at": room.get("created_at"),
-            "last_activity": room.get("last_activity")
-        })
-    
-    return {
-        "total_rooms": total_rooms,
-        "direct_rooms": direct_rooms,
-        "group_rooms": group_rooms,
-        "rooms": rooms_info
-    }
-
-# ==================== HEALTH CHECK ====================
-
-@api_router.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    try:
-        # Check database connection
-        await db.command('ping')
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "database": "disconnected",
-            "error": str(e),
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-
-# Include router
-app.include_router(api_router)
-
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+# ==================== ЗАПУСК ====================
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)

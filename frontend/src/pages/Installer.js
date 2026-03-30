@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import { CheckCircle2, Server, Shield, Lock, Database } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+const API = `/api`;
 
 const Installer = ({ onComplete }) => {
   const [step, setStep] = useState(1);
@@ -73,7 +73,7 @@ const Installer = ({ onComplete }) => {
     setError('');
 
     try {
-      const response = await axios.post(`${API}/install`, formData);
+      const response = await axios.post(`/api/install`, formData);
       
       setCredentials({
         username: formData.admin_username,
