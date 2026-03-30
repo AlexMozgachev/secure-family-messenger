@@ -146,8 +146,8 @@ export default function UserChat() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
-      <div style={{ width: 320, background: '#fff', borderRight: '0.5px solid #e0e0e0', display: 'flex', flexDirection: 'column', height: '100vh' }}>
-        <div style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 10, padding: '20px 16px', borderBottom: '0.5px solid #e0e0e0' }}>
+      <div style={{ width: 320, background: '#fff', borderRight: '0.5px solid #e0e0e0', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '20px 16px', borderBottom: '0.5px solid #e0e0e0' }}>
           <h2 style={{ fontSize: 24, fontWeight: 700 }}>Чаты</h2>
           <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
             <button onClick={logout} style={{ color: '#007AFF', background: 'none', border: 'none', fontSize: 14 }}>Выйти</button>
@@ -166,13 +166,13 @@ export default function UserChat() {
         </div>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', height: '100vh' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)' }}>
         {selectedRoom ? (
           <>
-            <div style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fff', padding: '12px 16px', borderBottom: '0.5px solid #e0e0e0' }}>
+            <div style={{ background: '#fff', padding: '12px 16px', borderBottom: '0.5px solid #e0e0e0' }}>
               <h2 style={{ fontSize: 17, fontWeight: 600 }}>{selectedRoom.name}</h2>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', background: 'transparent' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
               {messages.map(msg => {
                 const isOutgoing = msg.sender_id === user.id;
                 return (
@@ -200,7 +200,7 @@ export default function UserChat() {
               })}
               <div ref={messagesEndRef} />
             </div>
-            <div style={{ position: 'sticky', bottom: 0, background: '#fff', borderTop: '0.5px solid #e0e0e0', padding: '10px 16px' }}>
+            <div style={{ background: '#fff', borderTop: '0.5px solid #e0e0e0', padding: '10px 16px' }}>
               <div style={{ display: 'flex', gap: 12 }}>
                 <input type="file" accept="image/*" onChange={handleFileSelect} style={{ display: 'none' }} id="file-input" />
                 <label htmlFor="file-input" style={{ background: '#f5f5f5', width: 40, height: 40, borderRadius: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 20 }}>📷</label>
