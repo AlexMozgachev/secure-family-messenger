@@ -191,8 +191,9 @@ export default function UserChat() {
                         <img src={msg.image_url} alt="image" style={{ maxWidth: '100%', borderRadius: 12, marginBottom: 8, cursor: 'pointer' }} onClick={() => window.open(msg.image_url)} />
                       )}
                       {msg.content && <div style={{ fontSize: 15 }}>{msg.content}</div>}
-                      <div style={{ fontSize: 10, opacity: 0.6, marginTop: 4, textAlign: 'right' }}>
-                        {new Date(msg.created_at).toLocaleTimeString()}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 4 }}>
+                        <div style={{ fontSize: 10, opacity: 0.6 }}>{new Date(msg.created_at).toLocaleTimeString()}</div>
+                        {isOutgoing && <div style={{ fontSize: 10, opacity: 0.6 }}>✓</div>}
                       </div>
                     </div>
                   </div>
