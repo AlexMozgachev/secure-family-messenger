@@ -9,23 +9,19 @@ export default function UserLogin() {
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await axios.post('/api/auth/login', { username, password });
-      const { access_token, user } = response.data;
-      localStorage.setItem('token', access_token);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      // Перенаправляем в зависимости от роли
-      if (user.is_admin) {
-        navigate('/admin');
-      } else {
-        navigate('/chat');
-      }
-    } catch (err) {
-      setError('Неверный логин или пароль');
-    }
-  };
+  e.preventDefault();
+  try {
+    const response = await axios.post('/api/auth/login', { username, password });
+    const { access_token, user } = response.data;
+    localStorage.setItem('token', access_token);
+    localStorage.setItem('user', JSON.stringify(user));
+    
+    // Принудительный переход
+    window.location.href = user.is_admin ? '/admin' : '/chat';
+  } catch (err) {
+    setError('Неверный логин или пароль');
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
