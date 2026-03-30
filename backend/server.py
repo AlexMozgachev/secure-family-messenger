@@ -317,22 +317,21 @@ async def create_message(room_id: str, data: MessageCreate, current_user: dict =
         raise HTTPException(status_code=404, detail="Room not found")
     
     sender = await db.users.find_one({"id": current_user["id"]})
-    
     message = {
-        "id": str(uuid.uuid4()),
-        "sender_id": current_user["id"],
-        "sender": {
-            "username": sender.get("username"),
-            "display_name": sender.get("display_name")
-        },
-        "content": data.content,
-        "image_url": data.image_url,
-        "created_at": datetime.utcnow().isoformat(),
-        "edited_at": None,
-        "deleted": False,
-        "read_by": []
-    }
-    
+    "id": str(uuid.uuid4()),
+    "sender_id": current_user["id"],
+    "sender": {
+        "username": sender.get("username"),
+        "display_name": sender.get("display_name")
+    },
+    "content": data.content,
+    "image_url": data.image_url,
+    "created_at": datetime.utcnow().isoformat(),
+    "edited_at": None,
+    "deleted": False,
+    "read_by": [],
+    "delivered": False   # новое поле
+}
     await db.rooms.update_one(
         {"id": room_id},
         {
@@ -344,9 +343,8 @@ async def create_message(room_id: str, data: MessageCreate, current_user: dict =
     await manager.send_message(message, room_id)
     
     return convert_objectid(message)
-
-@app.post("/api/rooms/{room_id}/messages/{message_id}/read")
-async def mark_message_read(
+@app.post("/api/rooms/{room_id}/messages/{message_id}/delivered")
+async def mark_message_delivered(
     room_id: str,
     message_id: str,
     current_user: dict = Depends(get_current_user)
@@ -357,14 +355,20 @@ async def mark_message_read(
     
     result = await db.rooms.update_one(
         {"id": room_id, "messages.id": message_id},
-        {"$addToSet": {"messages.$.read_by": current_user["id"]}}
+        {"$set": {"messages.$.delivered": True}}
     )
     
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Message not found")
     
+    # Отправляем обновление статуса через WebSocket
+    await manager.send_message({
+        "type": "status_update",
+        "message_id": message_id,
+        "delivered": True
+    }, room_id)
+    
     return {"status": "ok"}
-
 # ==================== ЗАГРУЗКА ФАЙЛОВ ====================
 @app.post("/api/upload")
 async def upload_file(
@@ -483,6 +487,60 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
         manager.disconnect(websocket, room_id)
 
 # ==================== ЗАПУСК ====================
+@app.post("/api/rooms/{room_id}/messages/{message_id}/delivered")
+async def mark_message_delivered(
+    room_id: str,
+    message_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    room = await db.rooms.find_one({"id": room_id, "members": current_user["id"]})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    result = await db.rooms.update_one(
+        {"id": room_id, "messages.id": message_id},
+        {"$set": {"messages.$.delivered": True}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    # Отправляем обновление статуса через WebSocket
+    await manager.send_message({
+        "type": "status_update",
+        "message_id": message_id,
+        "delivered": True
+    }, room_id)
+    
+    return {"status": "ok"}
+
+@app.post("/api/rooms/{room_id}/messages/{message_id}/read")
+async def mark_message_read(
+    room_id: str,
+    message_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    room = await db.rooms.find_one({"id": room_id, "members": current_user["id"]})
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    result = await db.rooms.update_one(
+        {"id": room_id, "messages.id": message_id},
+        {"$addToSet": {"messages.$.read_by": current_user["id"]}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    # Отправляем обновление статуса через WebSocket
+    await manager.send_message({
+        "type": "status_update",
+        "message_id": message_id,
+        "read_by": [current_user["id"]]
+    }, room_id)
+    
+    return {"status": "ok"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
